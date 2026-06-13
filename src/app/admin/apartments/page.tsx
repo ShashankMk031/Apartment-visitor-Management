@@ -43,7 +43,7 @@ export default function AdminApartments() {
       } else {
         const supabase = createClient();
         if (supabase) {
-          const { data: apt } = await supabase.from('apartments').select('*').eq('id', 'apt-1').single();
+          const { data: apt } = await supabase.from('apartments').select('*').limit(1).maybeSingle();
           if (apt) setApartment(apt);
 
           const { count: resCount } = await supabase.from('residents').select('*', { count: 'exact', head: true });

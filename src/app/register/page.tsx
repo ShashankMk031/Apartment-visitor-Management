@@ -25,7 +25,18 @@ export default function RegisterPage() {
   const [isMock, setIsMock] = useState(true);
 
   useEffect(() => {
-    setIsMock(!hasSupabaseCreds());
+    const credsExist = hasSupabaseCreds();
+    setIsMock(!credsExist);
+    if (credsExist) {
+      const supabase = createClient();
+      if (supabase) {
+        supabase.from('apartments').select('id').limit(1).maybeSingle().then(({ data }) => {
+          if (data?.id) {
+            setApartmentId(data.id);
+          }
+        });
+      }
+    }
   }, []);
 
   const handleRegister = async (e: React.FormEvent) => {

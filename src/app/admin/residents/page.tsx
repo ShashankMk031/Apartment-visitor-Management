@@ -115,9 +115,12 @@ export default function AdminResidents() {
             role: 'RESIDENT'
           });
 
+          const { data: aptData } = await supabase.from('apartments').select('id').limit(1).maybeSingle();
+          const targetAptId = aptData?.id || '7b129750-705a-45c1-9d95-8e3ad7bb8fb5';
+
           const { error } = await supabase.from('residents').insert({
             id: newUserId,
-            apartment_id: 'apt-1',
+            apartment_id: targetAptId,
             flat_number: flatNumber,
             phone
           });

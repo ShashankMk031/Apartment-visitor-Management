@@ -80,11 +80,13 @@ export interface AuditLog {
 
 // Check if credentials exist
 export const hasSupabaseCreds = () => {
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   return (
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
+    !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
     process.env.NEXT_PUBLIC_SUPABASE_URL !== 'YOUR_SUPABASE_URL' &&
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY'
+    !!anonKey &&
+    anonKey !== 'YOUR_SUPABASE_ANON_KEY' &&
+    anonKey !== 'YOUR_SUPABASE_PUBLISHABLE_KEY'
   );
 };
 

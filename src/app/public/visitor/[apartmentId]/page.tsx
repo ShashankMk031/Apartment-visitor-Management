@@ -48,8 +48,16 @@ export default function VisitorPortalPage() {
       const fetchRealData = async () => {
         const supabase = createClient();
         if (supabase) {
-          // Fetch apartment
-          const { data: apt } = await supabase.from('apartments').select('*').eq('id', apartmentId).single();
+          // Fetch apartment - fallback to first apartment if 'apt-1' is passed
+          let aptIdToQuery = apartmentId;
+          if (apartmentId === 'apt-1') {
+            const { data: firstApt } = await supabase.from('apartments').select('id').limit(1).maybeSingle();
+            if (firstApt?.id) {
+              aptIdToQuery = firstApt.id;
+            }
+          }
+
+          const { data: apt } = await supabase.from('apartments').select('*').eq('id', aptIdToQuery).single();
           if (apt) setApartment(apt);
 
           // Fetch residents
@@ -64,12 +72,12 @@ export default function VisitorPortalPage() {
                 email
               )
             `)
-            .eq('apartment_id', apartmentId);
+            .eq('apartment_id', aptIdToQuery);
           
           if (res) {
             const mapped: Resident[] = res.map((r: any) => ({
               id: r.id,
-              apartment_id: apartmentId,
+              apartment_id: aptIdToQuery,
               flat_number: r.flat_number,
               full_name: r.profiles?.full_name || 'Resident',
               email: r.profiles?.email || '',
