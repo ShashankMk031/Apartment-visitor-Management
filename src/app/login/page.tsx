@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Shield, Home, Key, LogIn, AlertCircle } from 'lucide-react';
+import { Shield, Home, Key, LogIn, AlertCircle, RefreshCw } from 'lucide-react';
 import { mockDb, hasSupabaseCreds } from '@/lib/supabase/mockDb';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
@@ -114,121 +114,126 @@ function LoginPageContent() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center p-4 relative overflow-hidden">
-      {/* Background gradients */}
-      <div className="absolute top-[-20%] left-[-20%] w-[60%] h-[60%] rounded-full bg-emerald-950/20 blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-[-20%] right-[-20%] w-[60%] h-[60%] rounded-full bg-indigo-950/20 blur-[120px] pointer-events-none" />
+    <div className="min-h-screen bg-[#F0EDE8] text-[#2A2825] font-sans antialiased selection:bg-[#4E8079]/20 selection:text-[#4E8079] flex flex-col justify-center items-center p-4 relative">
       
-      <div className="w-full max-w-md z-10 space-y-6">
+      <div className="w-full max-w-md space-y-6 z-10">
+        
+        {/* Structural Minimalist Frame Header */}
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm mb-2">
-            <Shield className="w-4 h-4" />
-            <span>Secure Access Portal</span>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#E8E4DD] border border-white text-[#4E8079] text-xs font-semibold shadow-sm">
+            <RefreshCw className="w-3.5 h-3.5" strokeWidth={2} />
+            <span className="tracking-wide">Welcome Back User</span>
           </div>
-          <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-emerald-400 to-indigo-400 bg-clip-text text-transparent">
-            Apartment Visitor Management
-          </h1>
-          <p className="text-slate-400 text-sm">
-            Digital gatekeeping and resident approval system
+          <div className="logo w-full flex items-center justify-center">
+              <img src="/logo-icon.png" alt="logo" className="w-10 h-full" />
+              <span className="logo-text text-xl">Gate<span>Keeper</span></span>
+            </div>
+          <p className="text-[#6E685E] text-xs font-medium">
+            Digital gatekeeping & structured perimeter controls
           </p>
         </div>
 
-        <Card className="border-slate-800 bg-slate-900/60 backdrop-blur-xl shadow-2xl">
-          <CardHeader>
-            <CardTitle className="text-xl text-slate-100 flex items-center gap-2">
-              <LogIn className="w-5 h-5 text-emerald-400" />
-              Sign In
+        {/* Tactile Neumorphic Roster Card Plate */}
+        <Card className="border border-[#F5F3F0] bg-[#E8E4DD] rounded-[28px] shadow-[10px_10px_24px_rgba(163,157,147,0.35),-10px_-10px_24px_rgba(255,255,255,0.85)] p-2">
+          <CardHeader className="pb-3 pt-5 px-5 border-b border-[#DCD6CB]/80">
+            <CardTitle className="text-[#2A2825] font-bold text-sm flex items-center gap-2">
+              <div className="w-6 h-6 rounded-md bg-[#F0EDE8] border border-white flex items-center justify-center shadow-xs">
+                <LogIn className="w-3.5 h-3.5 text-[#4E8079]" strokeWidth={2} />
+              </div>
+              Console Authentication
             </CardTitle>
-            <CardDescription className="text-slate-400">
-              Enter your registered credentials below
+            <CardDescription className="text-xs text-[#6E685E] pt-0.5">
+              Provide authorized node credentials below
             </CardDescription>
           </CardHeader>
           
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 px-5 pt-4">
             {errorMsg && (
-              <div className="flex items-center gap-2 p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm">
-                <AlertCircle className="w-4 h-4 shrink-0" />
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-[#F2DBDB] border border-[#E8C2C2] text-[#9E4A4A] text-xs font-medium">
+                <AlertCircle className="w-4 h-4 shrink-0" strokeWidth={2} />
                 <span>{errorMsg}</span>
               </div>
             )}
             
             <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-slate-300">Email Address</Label>
+              {/* Micro-Indented Real-World Input Box */}
+              <div className="space-y-1.5">
+                <Label htmlFor="email" className="text-[10px] font-bold text-[#6E685E] uppercase tracking-wider font-mono pl-0.5">Email Matrix</Label>
                 <Input
                   id="email"
                   type="email"
                   placeholder="name@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="bg-slate-950 border-slate-800 text-slate-100 placeholder:text-slate-600 focus-visible:ring-emerald-500 focus-visible:border-emerald-500"
+                  className="bg-[#F0EDE8] border border-[#DCD6CB] text-xs text-[#2A2825] placeholder:text-[#9F988F] rounded-xl h-10 shadow-[inset_1px_1px_4px_rgba(163,157,147,0.15)] focus-visible:ring-1 focus-visible:ring-[#4E8079]"
                   required
                 />
               </div>
               
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <Label htmlFor="password" className="text-slate-300">Password</Label>
-                </div>
+              {/* Micro-Indented Real-World Input Box */}
+              <div className="space-y-1.5">
+                <Label htmlFor="password" className="text-[10px] font-bold text-[#6E685E] uppercase tracking-wider font-mono pl-0.5">Passphrase Key</Label>
                 <Input
                   id="password"
                   type="password"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="bg-slate-950 border-slate-800 text-slate-100 placeholder:text-slate-600 focus-visible:ring-emerald-500 focus-visible:border-emerald-500"
+                  className="bg-[#F0EDE8] border border-[#DCD6CB] text-xs text-[#2A2825] placeholder:text-[#9F988F] rounded-xl h-10 shadow-[inset_1px_1px_4px_rgba(163,157,147,0.15)] focus-visible:ring-1 focus-visible:ring-[#4E8079]"
                 />
               </div>
 
+              {/* Muted Soft Elevated Primary Teal CTA Button */}
               <Button
                 id="login-submit-btn"
                 type="submit"
                 disabled={loading}
-                className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-semibold transition-colors mt-2"
+                className="w-full bg-[#4E8079] hover:bg-[#3F6B65] active:bg-[#4E8079] active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.2)] text-white font-bold text-xs h-10 rounded-xl border border-[#6BA199] shadow-[2px_2px_6px_rgba(78,128,121,0.25)] transition-all mt-2 cursor-pointer"
               >
-                {loading ? 'Authenticating...' : 'Sign In'}
+                {loading ? 'Validating Node Token...' : 'Initialize Session'}
               </Button>
             </form>
           </CardContent>
 
-          <CardFooter className="flex flex-col border-t border-slate-800/60 pt-6 space-y-4">
+          <CardFooter className="flex flex-col border-t border-[#DCD6CB]/80 pt-4 pb-4 px-5 space-y-4">
             {/* Quick Demo logins */}
-            <div className="w-full space-y-3">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 block text-center">
-                Demo Quick Access (No Credentials Required)
+            <div className="w-full space-y-2.5">
+              <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-[#9F988F] block text-center">
+                System Quick Access Bypass
               </span>
               <div className="grid grid-cols-3 gap-2">
+                {/* Flat Tactile Interactive Grid Nodes */}
                 <button
                   type="button"
                   onClick={() => handleQuickLogin('admin@example.com')}
-                  className="flex flex-col items-center justify-center p-3 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 hover:border-indigo-500/40 text-indigo-300 hover:text-indigo-200 transition-all text-xs font-medium"
+                  className="flex flex-col items-center justify-center p-3 rounded-xl bg-[#F0EDE8] hover:bg-[#DCEBF2] border border-[#DCD6CB] hover:border-[#B9D9E8] text-[#4A453F] hover:text-[#3B6A80] transition-colors text-[11px] font-bold shadow-xs cursor-pointer"
                 >
-                  <Shield className="w-5 h-5 mb-1.5" />
+                  <Shield className="w-4 h-4 mb-1 text-[#477C94]" strokeWidth={1.8} />
                   <span>Admin</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => handleQuickLogin('resident1@example.com')}
-                  className="flex flex-col items-center justify-center p-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 hover:border-emerald-500/40 text-emerald-300 hover:text-emerald-200 transition-all text-xs font-medium"
+                  className="flex flex-col items-center justify-center p-3 rounded-xl bg-[#F0EDE8] hover:bg-[#D2E7E2] border border-[#DCD6CB] hover:border-[#B9D5CE] text-[#4A453F] hover:text-[#2E544F] transition-colors text-[11px] font-bold shadow-xs cursor-pointer"
                 >
-                  <Home className="w-5 h-5 mb-1.5" />
-                  <span>Resident 1</span>
+                  <Home className="w-4 h-4 mb-1 text-[#4E8079]" strokeWidth={1.8} />
+                  <span>Resident</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => handleQuickLogin('guard1@example.com')}
-                  className="flex flex-col items-center justify-center p-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 hover:border-amber-500/40 text-amber-300 hover:text-amber-200 transition-all text-xs font-medium"
+                  className="flex flex-col items-center justify-center p-3 rounded-xl bg-[#F0EDE8] hover:bg-[#F2ECD2] border border-[#DCD6CB] hover:border-[#E8DCB9] text-[#4A453F] hover:text-[#736031] transition-colors text-[11px] font-bold shadow-xs cursor-pointer"
                 >
-                  <Key className="w-5 h-5 mb-1.5" />
-                  <span>Guard 1</span>
+                  <Key className="w-4 h-4 mb-1 text-[#A1813B]" strokeWidth={1.8} />
+                  <span>Guard</span>
                 </button>
               </div>
             </div>
 
-            <div className="text-center">
-              <p className="text-xs text-slate-500">
-                Are you a visitor?{' '}
-                <Link href="/" className="text-emerald-400 hover:underline">
+            <div className="text-center pt-1 w-full border-t border-[#DCD6CB]/40">
+              <p className="text-xs text-[#6E685E] font-medium">
+                Unregistered Guest?{' '}
+                <Link href="/" className="text-[#4E8079] hover:text-[#3F6B65] font-bold hover:underline transition-colors ml-0.5">
                   Go to gate check-in
                 </Link>
               </p>
@@ -243,9 +248,9 @@ function LoginPageContent() {
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center p-4">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-emerald-500 mb-4"></div>
-        <p className="text-slate-400 text-sm animate-pulse">Loading login portal...</p>
+      <div className="min-h-screen bg-[#F0EDE8] text-[#2A2825] flex flex-col justify-center items-center p-4">
+        <RefreshCw className="w-6 h-6 text-[#4E8079] animate-spin" strokeWidth={1.8} />
+        <p className="text-[#6E685E] text-xs font-medium tracking-wide mt-3 animate-pulse">Syncing Cryptographic Module...</p>
       </div>
     }>
       <LoginPageContent />

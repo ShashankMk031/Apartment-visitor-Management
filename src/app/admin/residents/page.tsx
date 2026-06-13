@@ -15,7 +15,8 @@ import {
   Phone, 
   Mail, 
   User,
-  Plus
+  RefreshCw,
+  SlidersHorizontal
 } from 'lucide-react';
 import { mockDb, hasSupabaseCreds, Resident } from '@/lib/supabase/mockDb';
 import { createClient } from '@/lib/supabase/client';
@@ -104,8 +105,6 @@ export default function AdminResidents() {
       } else {
         const supabase = createClient();
         if (supabase) {
-          // In production, we register users using a supabase edge function or admin API to create the auth.users entry.
-          // For now, we will create the entry in profiles and residents directly for the dashboard view.
           const newUserId = crypto.randomUUID();
           
           await supabase.from('profiles').insert({
@@ -185,83 +184,104 @@ export default function AdminResidents() {
     );
   };
 
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] bg-[#F0EDE8] rounded-[28px] p-8">
+        <RefreshCw className="w-8 h-8 text-[#4E8079] animate-spin" strokeWidth={1.8} />
+        <span className="text-xs text-[#6E685E] font-medium mt-3 tracking-wide">Syncing Residents Database...</span>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="space-y-6 bg-[#F0EDE8] text-[#2A2825] font-sans antialiased selection:bg-[#4E8079]/20 selection:text-[#4E8079]">
+      
+      {/* Structural Minimalist Header Frame */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-5 border-b border-[#E0DACF]">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Residents Directory</h1>
-          <p className="text-sm text-slate-400">Green Glen Heights • Manage residents and flat associations</p>
+          <h1 className="text-2xl font-bold tracking-tight text-[#2A2825]">Residents Directory</h1>
+          <p className="text-xs text-[#6E685E] font-medium mt-0.5">Green Glen Heights • Manage residents and flat associations</p>
         </div>
         
+        {/* Soft Elevated Primary Teal CTA Button */}
         <Button 
           onClick={() => setAddOpen(true)}
-          className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold px-5 py-5 rounded-xl flex items-center gap-2"
+          className="bg-[#4E8079] hover:bg-[#3F6B65] active:bg-[#4E8079] active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.2)] text-white font-bold px-5 py-5 h-11 rounded-xl flex items-center gap-2 transition-all duration-150 shadow-[4px_4px_12px_rgba(78,128,121,0.35)] border border-[#6BA199] text-xs cursor-pointer"
         >
-          <UserPlus className="w-4 h-4" />
+          <UserPlus className="w-4 h-4" strokeWidth={2.2} />
           <span>Add Resident</span>
         </Button>
       </div>
 
-      {/* Roster Card */}
-      <Card className="bg-slate-900/40 border-slate-800 shadow-md">
-        <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4">
+      {/* Tactile Neumorphic Main Directory Card */}
+      <Card className="border border-[#F5F3F0] bg-[#E8E4DD] rounded-[24px] shadow-[8px_8px_20px_rgba(163,157,147,0.3),-8px_-8px_20px_rgba(255,255,255,0.8)] p-2">
+        <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 pt-4 px-5 border-b border-[#DCD6CB]/80">
           <div>
-            <CardTitle className="text-sm">Active Residents ({getFilteredResidents().length})</CardTitle>
-            <CardDescription className="text-xs text-slate-550">Overview of registered accounts</CardDescription>
+            <CardTitle className="text-[#2A2825] font-bold text-sm flex items-center gap-2">
+              <div className="w-6 h-6 rounded-md bg-[#F0EDE8] border border-white flex items-center justify-center shadow-xs">
+                <Users className="w-3.5 h-3.5 text-[#4E8079]" strokeWidth={2} />
+              </div>
+              Active Residents ({getFilteredResidents().length})
+            </CardTitle>
+            <CardDescription className="text-xs text-[#6E685E] pt-0.5">Overview of registered property accounts</CardDescription>
           </div>
+          
+          {/* Micro-Indented Real-World Input Box */}
           <div className="relative w-full sm:w-64">
-            <Search className="absolute left-2.5 top-3 w-4 h-4 text-slate-650" />
+            <Search className="absolute left-3 top-2.5 w-4 h-4 text-[#9F988F]" strokeWidth={2} />
             <Input
               type="text"
               placeholder="Search by name, flat, email..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-slate-950 border-slate-850 text-xs pl-9 text-slate-100 placeholder:text-slate-600 focus-visible:ring-emerald-500"
+              className="bg-[#F0EDE8] border border-[#DCD6CB] text-xs pl-9 text-[#2A2825] placeholder:text-[#9F988F] rounded-xl h-9 shadow-[inset_1px_1px_4px_rgba(163,157,147,0.15)] focus-visible:ring-1 focus-visible:ring-[#4E8079]"
             />
           </div>
         </CardHeader>
 
-        <CardContent>
+        <CardContent className="px-5 pt-3 pb-3">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="border-b border-slate-800 text-slate-500">
-                  <th className="py-3 font-semibold">Resident Name</th>
-                  <th className="py-3 font-semibold">Flat No.</th>
-                  <th className="py-3 font-semibold">Email</th>
-                  <th className="py-3 font-semibold">Phone</th>
-                  <th className="py-3 font-semibold text-right">Actions</th>
+                <tr className="border-b border-[#DCD6CB] text-[#8A8276] font-mono uppercase tracking-wider text-[10px]">
+                  <th className="py-3 font-bold">Resident Name</th>
+                  <th className="py-3 font-bold">Flat Mapping</th>
+                  <th className="py-3 font-bold">Email Endpoint</th>
+                  <th className="py-3 font-bold">Phone Connection</th>
+                  <th className="py-3 font-bold text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-900 text-slate-350">
+              <tbody className="divide-y divide-[#DCD6CB]/40 text-[#4A453F] font-medium">
                 {getFilteredResidents().length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-slate-650">
-                      No residents found matching query
+                    <td colSpan={5} className="py-12 text-center text-[#8A8276]">
+                      <SlidersHorizontal className="w-7 h-7 text-[#BCB5AB] mx-auto mb-2" strokeWidth={1.5} />
+                      No complex profiles correspond with the submitted parameters.
                     </td>
                   </tr>
                 ) : (
                   getFilteredResidents().map((res) => (
-                    <tr key={res.id} className="hover:bg-slate-900/10">
-                      <td className="py-3.5 font-bold text-slate-200">
+                    <tr key={res.id} className="hover:bg-[#F0EDE8]/40 transition-colors">
+                      <td className="py-3.5 font-bold text-[#2A2825]">
                         {res.full_name}
                       </td>
                       <td className="py-3.5">
-                        <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold px-2 py-0.5 rounded-md text-[10px]">
-                          Flat {res.flat_number}
+                        {/* Micro-Indented Flat Badge Accent */}
+                        <span className="bg-[#E1DCD3] text-[#4E8079] border border-[#D0C9BE] font-bold px-2 py-0.5 rounded-md text-[10px] shadow-[inset_0.5px_0.5px_2px_rgba(0,0,0,0.05)] font-mono">
+                          FLAT {res.flat_number}
                         </span>
                       </td>
-                      <td className="py-3.5">{res.email}</td>
-                      <td className="py-3.5">{res.phone}</td>
+                      <td className="py-3.5 text-[#5C564F]">{res.email}</td>
+                      <td className="py-3.5 font-mono text-[#5C564F]">{res.phone}</td>
                       <td className="py-3.5 text-right">
+                        {/* Smooth Action Trigger Icon */}
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => handleDeleteResident(res.id)}
-                          className="text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg"
+                          className="text-[#8A8276] hover:text-[#A1584E] hover:bg-[#A1584E]/10 h-8 w-8 rounded-lg cursor-pointer transition-colors"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-4 h-4" strokeWidth={1.8} />
                         </Button>
                       </td>
                     </tr>
@@ -273,99 +293,105 @@ export default function AdminResidents() {
         </CardContent>
       </Card>
 
-      {/* ADD RESIDENT DIALOG */}
+      {/* REGISTER RESIDENT TACTILE DIALOG POPUP MODAL */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="bg-slate-900 border-slate-800 text-slate-100 max-w-md rounded-3xl">
-          <DialogHeader>
-            <DialogTitle className="text-slate-150 flex items-center gap-2">
-              <UserPlus className="w-5 h-5 text-emerald-400" />
+        <DialogContent className="bg-[#E8E4DD] border border-[#F5F3F0] text-[#2A2825] max-w-md rounded-[28px] shadow-[12px_12px_36px_rgba(0,0,0,0.15),-12px_-12px_36px_rgba(255,255,255,0.9)] p-6">
+          <DialogHeader className="space-y-1">
+            <DialogTitle className="text-[#2A2825] font-bold flex items-center gap-2 text-sm">
+              <div className="w-7 h-7 rounded-lg bg-[#F0EDE8] border border-white flex items-center justify-center shadow-xs">
+                <UserPlus className="w-4 h-4 text-[#4E8079]" strokeWidth={2} />
+              </div>
               Register New Resident
             </DialogTitle>
-            <DialogDescription className="text-slate-500 text-xs">
+            <DialogDescription className="text-[#6E685E] text-xs pt-0.5">
               Add a new flat association. A profile will be created instantly.
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleAddResident} className="space-y-4 pt-3">
+          <form onSubmit={handleAddResident} className="space-y-4 pt-4">
+            
+            {/* Input 1 */}
             <div className="space-y-1.5">
-              <Label htmlFor="name" className="text-xs text-slate-400">Full Name</Label>
+              <Label htmlFor="name" className="text-[10px] font-bold text-[#6E685E] uppercase tracking-wider block font-mono pl-0.5">Full Name</Label>
               <div className="relative">
-                <User className="absolute left-3 top-3 w-4 h-4 text-slate-700" />
+                <User className="absolute left-3.5 top-2.5 w-4 h-4 text-[#9F988F]" strokeWidth={2} />
                 <Input
                   id="name"
                   type="text"
                   placeholder="e.g. Amit Sharma"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="bg-slate-950 border-slate-850 pl-10 text-xs text-slate-100"
+                  className="bg-[#F0EDE8] border border-[#DCD6CB] text-[#2A2825] placeholder:text-[#9F988F] text-xs rounded-xl py-4 h-10 pl-10 pr-3.5 shadow-[inset_1px_1px_4px_rgba(163,157,147,0.15)] focus-visible:ring-1 focus-visible:ring-[#4E8079]"
                   required
                 />
               </div>
             </div>
 
+            {/* Input 2 */}
             <div className="space-y-1.5">
-              <Label htmlFor="email" className="text-xs text-slate-400">Email Address</Label>
+              <Label htmlFor="email" className="text-[10px] font-bold text-[#6E685E] uppercase tracking-wider block font-mono pl-0.5">Email Address</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-3 w-4 h-4 text-slate-700" />
+                <Mail className="absolute left-3.5 top-2.5 w-4 h-4 text-[#9F988F]" strokeWidth={2} />
                 <Input
                   id="email"
                   type="email"
                   placeholder="name@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="bg-slate-950 border-slate-850 pl-10 text-xs text-slate-100"
+                  className="bg-[#F0EDE8] border border-[#DCD6CB] text-[#2A2825] placeholder:text-[#9F988F] text-xs rounded-xl py-4 h-10 pl-10 pr-3.5 shadow-[inset_1px_1px_4px_rgba(163,157,147,0.15)] focus-visible:ring-1 focus-visible:ring-[#4E8079]"
                   required
                 />
               </div>
             </div>
 
+            {/* Two-Column Input Row */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label htmlFor="phone" className="text-xs text-slate-400">Phone Number</Label>
+                <Label htmlFor="phone" className="text-[10px] font-bold text-[#6E685E] uppercase tracking-wider block font-mono pl-0.5">Phone Number</Label>
                 <div className="relative">
-                  <Phone className="absolute left-3 top-3 w-4 h-4 text-slate-700" />
+                  <Phone className="absolute left-3.5 top-2.5 w-4 h-4 text-[#9F988F]" strokeWidth={2} />
                   <Input
                     id="phone"
                     type="tel"
                     placeholder="+91..."
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="bg-slate-950 border-slate-850 pl-10 text-xs text-slate-100"
+                    className="bg-[#F0EDE8] border border-[#DCD6CB] text-[#2A2825] placeholder:text-[#9F988F] text-xs rounded-xl py-4 h-10 pl-10 pr-3.5 shadow-[inset_1px_1px_4px_rgba(163,157,147,0.15)] focus-visible:ring-1 focus-visible:ring-[#4E8079]"
                     required
                   />
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="flat" className="text-xs text-slate-400">Flat Number</Label>
+                <Label htmlFor="flat" className="text-[10px] font-bold text-[#6E685E] uppercase tracking-wider block font-mono pl-0.5">Flat Number</Label>
                 <div className="relative">
-                  <Home className="absolute left-3 top-3 w-4 h-4 text-slate-700" />
+                  <Home className="absolute left-3.5 top-2.5 w-4 h-4 text-[#9F988F]" strokeWidth={2} />
                   <Input
                     id="flat"
                     type="text"
                     placeholder="e.g. 304"
                     value={flatNumber}
                     onChange={(e) => setFlatNumber(e.target.value)}
-                    className="bg-slate-950 border-slate-850 pl-10 text-xs text-slate-100"
+                    className="bg-[#F0EDE8] border border-[#DCD6CB] text-[#2A2825] placeholder:text-[#9F988F] text-xs rounded-xl py-4 h-10 pl-10 pr-3.5 shadow-[inset_1px_1px_4px_rgba(163,157,147,0.15)] focus-visible:ring-1 focus-visible:ring-[#4E8079]"
                     required
                   />
                 </div>
               </div>
             </div>
 
-            <DialogFooter className="pt-4 border-t border-slate-800/60 mt-4">
+            {/* Modal Actions */}
+            <DialogFooter className="mt-6 flex gap-3 sm:space-x-0 pt-2">
               <Button 
                 type="button" 
-                variant="ghost" 
                 onClick={() => setAddOpen(false)}
-                className="bg-slate-950 border border-slate-800 hover:bg-slate-900 text-slate-300 rounded-xl"
+                className="w-1/2 bg-[#F0EDE8] hover:bg-[#DCD6CB]/60 text-[#5C564F] font-bold border border-[#DCD6CB] text-xs h-10 rounded-xl cursor-pointer"
               >
                 Cancel
               </Button>
               <Button 
                 type="submit" 
                 disabled={saving}
-                className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-xl"
+                className="w-1/2 bg-[#4E8079] hover:bg-[#3F6B65] active:bg-[#4E8079] active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.2)] text-white font-bold text-xs h-10 rounded-xl border border-[#6BA199] shadow-sm cursor-pointer"
               >
                 {saving ? 'Adding...' : 'Add Resident'}
               </Button>

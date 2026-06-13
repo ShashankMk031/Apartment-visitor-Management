@@ -5,25 +5,25 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { 
   Scan, 
   LogIn, 
   LogOut, 
   Clock, 
-  CheckCircle, 
   Search, 
   ShieldAlert, 
   Phone, 
   Home, 
   UserCheck2,
-  ListFilter,
   Camera,
   Calendar,
   Info,
   RefreshCw,
-  AlertTriangle
+  AlertTriangle,
+  SlidersHorizontal,
+  Maximize2
 } from 'lucide-react';
 import { mockDb, hasSupabaseCreds, VisitorRequest, VisitorEntry, Resident } from '@/lib/supabase/mockDb';
 import { createClient } from '@/lib/supabase/client';
@@ -74,18 +74,15 @@ export default function GuardDashboard() {
         const resList = mockDb.getResidents();
         setResidents(resList);
 
-        // Fetch active emergencies
         const emergencies = mockDb.getEmergencyAlerts().filter(a => a.status === 'ACTIVE');
         setActiveAlerts(emergencies);
 
-        // 1. Approved requests (not yet checked in)
         const entries = mockDb.getVisitorEntries();
         const checkedInRequestIds = new Set(entries.map(e => e.visitor_request_id));
         
         const approved = allReqs.filter(r => r.status === 'APPROVED' && !checkedInRequestIds.has(r.id));
         setApprovedRequests(approved);
 
-        // 2. Active inside
         const activeInside = entries
           .filter(e => !e.exit_time)
           .map(e => {
@@ -100,7 +97,6 @@ export default function GuardDashboard() {
           .filter(e => e.request !== undefined);
         setInsideEntries(activeInside);
 
-        // 3. All logs
         const logs = entries
           .map(e => {
             const req = allReqs.find(r => r.id === e.visitor_request_id)!;
@@ -125,15 +121,12 @@ export default function GuardDashboard() {
             });
           }
 
-          // Fetch active alerts
           const { data: alerts } = await supabase.from('emergency_alerts').select('*').eq('status', 'ACTIVE');
           if (alerts) setActiveAlerts(alerts);
 
-          // Fetch residents
           const { data: res } = await supabase.from('residents').select('*');
           if (res) setResidents(res);
 
-          // Fetch requests & entries
           const { data: reqs } = await supabase.from('visitor_requests').select('*');
           const { data: entries } = await supabase.from('visitor_entries').select('*').order('entry_time', { ascending: false });
 
@@ -182,7 +175,7 @@ export default function GuardDashboard() {
 
     const interval = setInterval(() => {
       loadData();
-    }, 5000); // Sync every 5s
+    }, 5000);
 
     return () => {
       clearInterval(interval);
@@ -192,7 +185,6 @@ export default function GuardDashboard() {
     };
   }, [cameraStream]);
 
-  // Webcam API helpers
   const startCamera = async (deviceId?: string) => {
     try {
       if (cameraStream) {
@@ -256,7 +248,6 @@ export default function GuardDashboard() {
     setTimeout(() => {
       setScanning(false);
 
-      // Handle frequent visitor QR
       if (scannedCode.startsWith('FREQ-')) {
         const list = mockDb.getFrequentVisitors();
         const visitor = list.find(v => v.qr_code === scannedCode);
@@ -271,11 +262,10 @@ export default function GuardDashboard() {
         return;
       }
 
-      // Handle standard visitor QR
       let reqId = scannedCode;
       if (scannedCode.startsWith('PASS-')) {
         const parts = scannedCode.split('-');
-        reqId = `${parts[1]}-${parts[2]}`; // Reconstructs req-1
+        reqId = `${parts[1]}-${parts[2]}`;
       }
       
       let req: VisitorRequest | undefined = undefined;
@@ -355,7 +345,6 @@ export default function GuardDashboard() {
           loadData();
         }
       } else {
-        // Real Supabase flow for frequent visitor auto-entry
         const supabase = createClient();
         if (supabase && scannedFrequentVisitor) {
           let type: any = 'OTHER';
@@ -363,7 +352,6 @@ export default function GuardDashboard() {
           else if (scannedFrequentVisitor.category === 'DRIVER') type = 'DRIVER';
           else if (scannedFrequentVisitor.category === 'COOK') type = 'COOK';
           
-          // 1. Create approved request
           const { data: newReq, error: reqErr } = await supabase
             .from('visitor_requests')
             .insert({
@@ -384,7 +372,6 @@ export default function GuardDashboard() {
             return;
           }
 
-          // 2. Mark entry
           const { error: entErr } = await supabase
             .from('visitor_entries')
             .insert({
@@ -482,24 +469,34 @@ export default function GuardDashboard() {
       totalVisits,
       firstVisit,
       lastVisit,
-      visitsList: sortedVisits.reverse(), // Latest first
+      visitsList: sortedVisits.reverse(),
     });
     setInsightsOpen(true);
   };
 
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] bg-[#F0EDE8] rounded-[28px] p-8">
+        <RefreshCw className="w-8 h-8 text-[#4E8079] animate-spin" strokeWidth={1.8} />
+        <span className="text-xs text-[#6E685E] font-medium mt-3 tracking-wide">Syncing Security Perimeter...</span>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
-      {/* Emergency Alert banners inside guard dashboard */}
+    <div className="space-y-6 bg-[#F0EDE8] text-[#2A2825] font-sans antialiased selection:bg-[#4E8079]/20 selection:text-[#4E8079]">
+      
+      {/* Emergency Active Banner */}
       {activeAlerts.length > 0 && (
-        <div className="bg-rose-950/80 border border-rose-500/30 text-rose-200 p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 animate-pulse">
+        <div className="bg-[#EADCDA] border border-[#D1AFA9] text-[#913B2E] p-4 rounded-[20px] flex flex-col sm:flex-row items-center justify-between gap-4 shadow-[4px_4px_12px_rgba(145,59,46,0.15)] animate-pulse">
           <div className="flex items-center gap-3">
-            <ShieldAlert className="w-8 h-8 text-rose-500 animate-bounce" />
+            <ShieldAlert className="w-6 h-6 text-[#913B2E]" strokeWidth={2} />
             <div>
-              <span className="font-extrabold text-sm uppercase tracking-wider text-rose-100 block">🚨 URGENT ALERTS ON-SITE</span>
-              <span className="text-xs text-rose-300">
+              <span className="font-bold text-xs uppercase tracking-wider block">Urgent Premises Alert</span>
+              <span className="text-xs opacity-90 font-medium">
                 {activeAlerts.map(a => {
                   const res = residents.find(r => r.id === a.resident_id);
-                  return `Flat ${res?.flat_number || 'TBD'} (${a.alert_type})`;
+                  return `Flat ${res?.flat_number || 'TBD'} requests immediate support (${a.alert_type})`;
                 }).join(', ')}
               </span>
             </div>
@@ -523,21 +520,21 @@ export default function GuardDashboard() {
                 }
               }
             }}
-            className="bg-rose-500 hover:bg-rose-600 text-slate-950 font-extrabold text-xs py-2 px-4 rounded-xl cursor-pointer"
+            className="bg-[#913B2E] hover:bg-[#782F24] text-white font-bold text-xs px-4 h-9 rounded-xl border border-[#A64A3C] shadow-sm transition-all"
           >
-            Resolve First Alert
+            Acknowledge & Resolve
           </Button>
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      {/* Structural Minimalist Header Frame */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-5 border-b border-[#E0DACF]">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-100">Gate Control Desk</h1>
-          <p className="text-sm text-slate-400">Welcome, Guard {user?.user_metadata?.full_name || ''} • gatekeeper station</p>
+          <h1 className="text-2xl font-bold tracking-tight text-[#2A2825]">Gate Control Desk</h1>
+          <p className="text-xs text-[#6E685E] font-medium mt-0.5">Stationed Guard: {user?.user_metadata?.full_name || 'Officer'} • Gatekeeper Portal</p>
         </div>
         
-        {/* QR Scan trigger */}
+        {/* Soft Elevated Primary Teal CTA Button */}
         <Button 
           onClick={() => {
             setScannerOpen(true);
@@ -545,54 +542,52 @@ export default function GuardDashboard() {
             setScannedRequest(null);
             setScannedFrequentVisitor(null);
           }}
-          className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold px-6 py-5 rounded-xl flex items-center gap-2 shadow-lg shadow-emerald-500/10 cursor-pointer"
+          className="bg-[#4E8079] hover:bg-[#3F6B65] active:bg-[#4E8079] active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.2)] text-white font-bold px-5 py-5 h-11 rounded-xl flex items-center gap-2 transition-all duration-150 shadow-[4px_4px_12px_rgba(78,128,121,0.35)] border border-[#6BA199] text-xs cursor-pointer"
         >
-          <Scan className="w-5 h-5 animate-pulse" />
+          <Scan className="w-4 h-4" strokeWidth={2.2} />
           <span>Scan Access Pass</span>
         </Button>
       </div>
 
-      {/* Grid of lists */}
+      {/* Live State Split Column Grids */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
-        {/* Left Column: Active inside */}
+        {/* Left Grid: Live On-Site Active Arrivals */}
         <div className="lg:col-span-6 space-y-4">
-          <Card className="bg-slate-900/40 border-slate-800 shadow-md">
-            <CardHeader className="flex justify-between items-start pb-3">
+          <Card className="border border-[#F5F3F0] bg-[#E8E4DD] rounded-[24px] shadow-[6px_6px_16px_rgba(163,157,147,0.25),-6px_-6px_16px_rgba(255,255,255,0.85)] p-2">
+            <CardHeader className="flex flex-row justify-between items-center pb-3 pt-3 px-4 border-b border-[#DCD6CB]/80">
               <div>
-                <CardTitle className="text-sm text-slate-200">Inside Premise ({insideEntries.length})</CardTitle>
-                <CardDescription className="text-xs text-slate-500">Visitors currently inside the apartment</CardDescription>
+                <CardTitle className="text-[#2A2825] font-bold text-xs uppercase tracking-wider flex items-center gap-2">
+                  On-Premises Logs ({insideEntries.length})
+                </CardTitle>
+                <CardDescription className="text-[11px] text-[#6E685E] pt-0.5">Visitors currently verified on-site</CardDescription>
               </div>
-              <Badge className="bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-bold">LIVE ON-SITE</Badge>
+              <Badge className="bg-[#EADEC9] text-[#7A6031] border border-[#DBCFB8] text-[9px] font-bold px-2 py-0.5 shadow-[inset_0.5px_0.5px_2px_rgba(0,0,0,0.02)] transition-none rounded-md">LIVE INSIDE</Badge>
             </CardHeader>
-
-            <CardContent className="space-y-3 max-h-[450px] overflow-y-auto pr-1">
+            <CardContent className="space-y-2.5 max-h-[400px] overflow-y-auto pt-3 px-4">
               {insideEntries.length === 0 ? (
-                <div className="text-center py-16 text-xs text-slate-550 border border-dashed border-slate-850 rounded-2xl">
-                  No visitors currently inside
+                <div className="text-center py-12 text-xs text-[#8A8276] border border-dashed border-[#DCD6CB] rounded-xl font-medium">
+                  No visitors currently inside residential limits.
                 </div>
               ) : (
                 insideEntries.map((entry) => (
-                  <div key={entry.id} className="p-4 rounded-2xl bg-slate-950/40 border border-slate-850 flex items-center justify-between gap-4">
-                    <div className="space-y-1 min-w-0">
+                  <div key={entry.id} className="p-3.5 rounded-xl bg-[#F0EDE8] border border-[#E1DCD3] flex items-center justify-between gap-4 shadow-[1px_1px_3px_rgba(0,0,0,0.02)]">
+                    <div className="space-y-0.5 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-slate-200 truncate">{entry.request.visitor_name}</span>
-                        <span className="text-[10px] font-bold text-slate-500">Flat {entry.residentFlat}</span>
+                        <span className="font-bold text-xs text-[#2A2825] truncate">{entry.request.visitor_name}</span>
+                        <span className="bg-[#E1DCD3] text-[#4E8079] border border-[#D0C9BE] font-bold px-1.5 py-0.2 rounded text-[9px] font-mono shadow-[inset_0.5px_0.5px_1px_rgba(0,0,0,0.03)]">FLAT {entry.residentFlat}</span>
                       </div>
-                      <span className="text-[11px] text-slate-400 block truncate">Purpose: {entry.request.purpose}</span>
-                      <span className="text-[10px] text-slate-600 flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5" />
-                        Entered: {new Date(entry.entry_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      <span className="text-[11px] text-[#5C564F] block truncate">Purpose: {entry.request.purpose}</span>
+                      <span className="text-[10px] text-[#8A8276] flex items-center gap-1 pt-0.5 font-mono">
+                        <Clock className="w-3 h-3 text-[#9F988F]" strokeWidth={2} /> In: {new Date(entry.entry_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
-
-                    <Button
-                      size="sm"
-                      onClick={() => handleMarkExit(entry.request.id)}
-                      className="bg-slate-900 hover:bg-slate-800 border border-slate-800 text-rose-400 hover:text-rose-300 font-semibold text-xs rounded-xl cursor-pointer"
+                    <Button 
+                      size="sm" 
+                      onClick={() => handleMarkExit(entry.request.id)} 
+                      className="bg-[#F0EDE8] hover:bg-[#EADEC9]/40 border border-[#DCD6CB] text-[#A1584E] hover:text-[#8C463D] font-bold text-[11px] h-8 px-3 rounded-lg shadow-xs transition-colors cursor-pointer"
                     >
-                      <LogOut className="w-3.5 h-3.5 mr-1" />
-                      Checkout
+                      <LogOut className="w-3 h-3 mr-1" strokeWidth={2.2} /> Checkout
                     </Button>
                   </div>
                 ))
@@ -601,46 +596,44 @@ export default function GuardDashboard() {
           </Card>
         </div>
 
-        {/* Right Column: Approved & Upcoming */}
+        {/* Right Grid: Pending Pre-Approved Entries */}
         <div className="lg:col-span-6 space-y-4">
-          <Card className="bg-slate-900/40 border-slate-800 shadow-md">
-            <CardHeader className="flex justify-between items-start pb-3">
+          <Card className="border border-[#F5F3F0] bg-[#E8E4DD] rounded-[24px] shadow-[6px_6px_16px_rgba(163,157,147,0.25),-6px_-6px_16px_rgba(255,255,255,0.85)] p-2">
+            <CardHeader className="flex flex-row justify-between items-center pb-3 pt-3 px-4 border-b border-[#DCD6CB]/80">
               <div>
-                <CardTitle className="text-sm text-slate-200">Resident Approved ({approvedRequests.length})</CardTitle>
-                <CardDescription className="text-xs text-slate-500">Upcoming arrivals waiting for entry</CardDescription>
+                <CardTitle className="text-[#2A2825] font-bold text-xs uppercase tracking-wider flex items-center gap-2">
+                  Resident Pre-Approvals ({approvedRequests.length})
+                </CardTitle>
+                <CardDescription className="text-[11px] text-[#6E685E] pt-0.5">Upcoming pass clearances awaiting checkpoint</CardDescription>
               </div>
-              <Badge className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-[10px] font-bold">APPROVED GATES</Badge>
+              <Badge className="bg-[#D2E7E2] text-[#3B6660] border border-[#B9D5CE] text-[9px] font-bold px-2 py-0.5 shadow-[inset_0.5px_0.5px_2px_rgba(0,0,0,0.02)] transition-none rounded-md">APPROVED</Badge>
             </CardHeader>
-
-            <CardContent className="space-y-3 max-h-[450px] overflow-y-auto pr-1">
+            <CardContent className="space-y-2.5 max-h-[400px] overflow-y-auto pt-3 px-4">
               {approvedRequests.length === 0 ? (
-                <div className="text-center py-16 text-xs text-slate-550 border border-dashed border-slate-850 rounded-2xl">
-                  No upcoming approved visits
+                <div className="text-center py-12 text-xs text-[#8A8276] border border-dashed border-[#DCD6CB] rounded-xl font-medium">
+                  No upcoming pre-approved entries available.
                 </div>
               ) : (
                 approvedRequests.map((req) => {
                   const res = residents.find(r => r.id === req.resident_id);
                   return (
-                    <div key={req.id} className="p-4 rounded-2xl bg-slate-950/40 border border-slate-850 flex items-center justify-between gap-4">
-                      <div className="space-y-1 min-w-0">
+                    <div key={req.id} className="p-3.5 rounded-xl bg-[#F0EDE8] border border-[#E1DCD3] flex items-center justify-between gap-4 shadow-[1px_1px_3px_rgba(0,0,0,0.02)]">
+                      <div className="space-y-0.5 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="font-bold text-sm text-slate-200 truncate">{req.visitor_name}</span>
-                          <span className="text-[10px] font-bold text-slate-500">Flat {res?.flat_number}</span>
+                          <span className="font-bold text-xs text-[#2A2825] truncate">{req.visitor_name}</span>
+                          <span className="bg-[#E1DCD3] text-[#4E8079] border border-[#D0C9BE] font-bold px-1.5 py-0.2 rounded text-[9px] font-mono shadow-[inset_0.5px_0.5px_1px_rgba(0,0,0,0.03)]">FLAT {res?.flat_number}</span>
                         </div>
-                        <span className="text-[11px] text-slate-400 block truncate">Type: {req.visitor_type} • {req.purpose}</span>
-                        <span className="text-[10px] text-slate-600 flex items-center gap-1">
-                          <Clock className="w-3.5 h-3.5" />
-                          Approved: {req.approval_time ? new Date(req.approval_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                        <span className="text-[11px] text-[#5C564F] block truncate">Type: {req.visitor_type} • {req.purpose}</span>
+                        <span className="text-[10px] text-[#8A8276] flex items-center gap-1 pt-0.5 font-mono">
+                          <Clock className="w-3 h-3 text-[#9F988F]" strokeWidth={2} /> Set: {req.approval_time ? new Date(req.approval_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                         </span>
                       </div>
-
-                      <Button
-                        size="sm"
-                        onClick={() => handleMarkEntry(req.id)}
-                        className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs rounded-xl cursor-pointer"
+                      <Button 
+                        size="sm" 
+                        onClick={() => handleMarkEntry(req.id)} 
+                        className="bg-[#4E8079] hover:bg-[#3F6B65] text-white font-bold text-[11px] h-8 px-3 rounded-lg shadow-sm border border-[#6BA199] transition-all cursor-pointer"
                       >
-                        <LogIn className="w-3.5 h-3.5 mr-1" />
-                        Checkin
+                        <LogIn className="w-3 h-3 mr-1" strokeWidth={2.2} /> Checkin
                       </Button>
                     </div>
                   );
@@ -649,112 +642,127 @@ export default function GuardDashboard() {
             </CardContent>
           </Card>
         </div>
+
       </div>
 
-      {/* Historical Logs List */}
-      <Card className="bg-slate-900/40 border-slate-800 shadow-md">
-        <CardHeader className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 pb-4">
-          <div className="space-y-1">
-            <CardTitle className="text-sm">Visitor Log History & Insights</CardTitle>
-            <CardDescription className="text-xs text-slate-500">Search past gate logs, apply date filters, and query check-in metrics</CardDescription>
+      {/* Historical Ledger Table Card Container */}
+      <Card className="border border-[#F5F3F0] bg-[#E8E4DD] rounded-[24px] shadow-[8px_8px_20px_rgba(163,157,147,0.3),-8px_-8px_20px_rgba(255,255,255,0.8)] p-2">
+        <CardHeader className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 pb-4 pt-4 px-5 border-b border-[#DCD6CB]/80">
+          <div>
+            <CardTitle className="text-[#2A2825] font-bold text-sm flex items-center gap-2">
+              <div className="w-6 h-6 rounded-md bg-[#F0EDE8] border border-white flex items-center justify-center shadow-xs">
+                <UserCheck2 className="w-3.5 h-3.5 text-[#4E8079]" strokeWidth={2} />
+              </div>
+              Checkpoint Ledger & Analytics
+            </CardTitle>
+            <CardDescription className="text-xs text-[#6E685E] pt-0.5">Granular audit track and structural entry-point parameters</CardDescription>
           </div>
-          
-          {/* Advanced Search Filters */}
+
+          {/* Micro-Indented Real-World Filtering Rows */}
           <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
-            <div className="relative flex-1 sm:flex-initial sm:w-56">
-              <Search className="absolute left-2.5 top-3 w-4 h-4 text-slate-600" />
+            <div className="relative w-full sm:w-52">
+              <Search className="absolute left-3 top-2.5 w-4 h-4 text-[#9F988F]" strokeWidth={2} />
               <Input
                 type="text"
-                placeholder="Name, phone, flat..."
+                placeholder="Search name, phone, flat..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-slate-950 border-slate-850 text-xs pl-9 text-slate-100 placeholder:text-slate-655 focus-visible:ring-emerald-500"
+                className="bg-[#F0EDE8] border border-[#DCD6CB] text-xs pl-9 text-[#2A2825] placeholder:text-[#9F988F] rounded-xl h-9 shadow-[inset_1px_1px_4px_rgba(163,157,147,0.15)] focus-visible:ring-1 focus-visible:ring-[#4E8079]"
               />
             </div>
-            
+
             <div className="flex items-center gap-2 w-full sm:w-auto">
-              <div className="flex items-center gap-1 bg-slate-950 border border-slate-850 rounded-xl px-2.5 py-1 text-slate-400">
-                <span className="text-[9px] uppercase font-bold text-slate-600 mr-1">From</span>
-                <input
-                  type="date"
-                  value={searchStartDate}
-                  onChange={(e) => setSearchStartDate(e.target.value)}
-                  className="bg-transparent border-none text-[11px] text-slate-200 focus:outline-none"
+              {/* Recessed From Date Input */}
+              <div className="flex items-center gap-1 bg-[#F0EDE8] border border-[#DCD6CB] rounded-xl px-2 py-1 shadow-[inset_1px_1px_4px_rgba(0,0,0,0.05)] text-[#5C564F]">
+                <span className="text-[9px] uppercase font-bold text-[#8A8276] mr-1 font-mono">From</span>
+                <input 
+                  type="date" 
+                  value={searchStartDate} 
+                  onChange={(e) => setSearchStartDate(e.target.value)} 
+                  className="bg-transparent border-none text-[11px] text-[#2A2825] focus:outline-none focus:ring-0 text-xs font-medium cursor-pointer" 
                 />
               </div>
-              <div className="flex items-center gap-1 bg-slate-950 border border-slate-850 rounded-xl px-2.5 py-1 text-slate-400">
-                <span className="text-[9px] uppercase font-bold text-slate-600 mr-1">To</span>
-                <input
-                  type="date"
-                  value={searchEndDate}
-                  onChange={(e) => setSearchEndDate(e.target.value)}
-                  className="bg-transparent border-none text-[11px] text-slate-200 focus:outline-none"
+
+              {/* Recessed To Date Input */}
+              <div className="flex items-center gap-1 bg-[#F0EDE8] border border-[#DCD6CB] rounded-xl px-2 py-1 shadow-[inset_1px_1px_4px_rgba(0,0,0,0.05)] text-[#5C564F]">
+                <span className="text-[9px] uppercase font-bold text-[#8A8276] mr-1 font-mono">To</span>
+                <input 
+                  type="date" 
+                  value={searchEndDate} 
+                  onChange={(e) => setSearchEndDate(e.target.value)} 
+                  className="bg-transparent border-none text-[11px] text-[#2A2825] focus:outline-none focus:ring-0 text-xs font-medium cursor-pointer" 
                 />
               </div>
+
               {(searchStartDate || searchEndDate || searchQuery) && (
                 <Button 
-                  size="icon" 
-                  variant="ghost"
-                  onClick={() => {
-                    setSearchStartDate('');
-                    setSearchEndDate('');
-                    setSearchQuery('');
-                  }}
-                  className="h-8 w-8 text-slate-500 hover:text-slate-300 rounded-lg cursor-pointer"
+                  variant="ghost" 
+                  onClick={() => { setSearchStartDate(''); setSearchEndDate(''); setSearchQuery(''); }}
+                  className="text-xs text-[#8A8276] hover:text-[#2A2825] h-9 px-2 rounded-xl"
                 >
-                  <RefreshCw className="w-3.5 h-3.5" />
+                  Reset
                 </Button>
               )}
             </div>
           </div>
         </CardHeader>
 
-        <CardContent>
+        <CardContent className="px-5 pt-3 pb-3">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="border-b border-slate-800 text-slate-500">
-                  <th className="py-3 font-semibold">Visitor</th>
-                  <th className="py-3 font-semibold">Host Flat</th>
-                  <th className="py-3 font-semibold">Type</th>
-                  <th className="py-3 font-semibold">Entry Time</th>
-                  <th className="py-3 font-semibold">Exit Time</th>
-                  <th className="py-3 font-semibold text-right">Actions</th>
+                <tr className="border-b border-[#DCD6CB] text-[#8A8276] font-mono uppercase tracking-wider text-[10px]">
+                  <th className="py-3 font-bold">Visitor Reference</th>
+                  <th className="py-3 font-bold">Flat Association</th>
+                  <th className="py-3 font-bold">Purpose / Details</th>
+                  <th className="py-3 font-bold">Check-In Node</th>
+                  <th className="py-3 font-bold">Check-Out Node</th>
+                  <th className="py-3 font-bold text-right">Metrics</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-900 text-slate-300">
+              <tbody className="divide-y divide-[#DCD6CB]/40 text-[#4A453F] font-medium">
                 {getFilteredLogs().length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-8 text-center text-slate-600">
-                      No logs matching search criteria
+                    <td colSpan={6} className="py-12 text-center text-[#8A8276]">
+                      <SlidersHorizontal className="w-7 h-7 text-[#BCB5AB] mx-auto mb-2" strokeWidth={1.5} />
+                      No visitor trails map directly with the specified ledger parameters.
                     </td>
                   </tr>
                 ) : (
                   getFilteredLogs().map((log) => (
-                    <tr key={log.id} className="hover:bg-slate-900/20">
-                      <td className="py-3 font-bold text-slate-200">
-                        {log.request.visitor_name}
-                        <span className="text-[10px] text-slate-500 block">{log.request.visitor_phone}</span>
+                    <tr key={log.id} className="hover:bg-[#F0EDE8]/40 transition-colors">
+                      <td className="py-3.5 font-bold text-[#2A2825]">
+                        <div className="space-y-0.5">
+                          <div className="text-xs font-bold text-[#2A2825]">{log.request.visitor_name}</div>
+                          <div className="text-[10px] text-[#8A8276] font-mono">{log.request.visitor_phone}</div>
+                        </div>
                       </td>
-                      <td className="py-3">Flat {log.residentFlat}</td>
-                      <td className="py-3">
-                        <span className="capitalize">{log.request.visitor_type.toLowerCase()}</span>
+                      <td className="py-3.5">
+                        <span className="bg-[#E1DCD3] text-[#4E8079] border border-[#D0C9BE] font-bold px-2 py-0.5 rounded-md text-[10px] shadow-[inset_0.5px_0.5px_2px_rgba(0,0,0,0.05)] font-mono">
+                          FLAT {log.residentFlat}
+                        </span>
                       </td>
-                      <td className="py-3">{new Date(log.entry_time).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</td>
-                      <td className="py-3">
-                        {log.exit_time 
-                          ? new Date(log.exit_time).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })
-                          : <span className="text-amber-400 font-semibold">On Premise</span>}
+                      <td className="py-3.5 text-[#5C564F]">
+                        <div className="max-w-[180px] truncate">{log.request.purpose}</div>
                       </td>
-                      <td className="py-3 text-right">
-                        <Button 
-                          size="sm"
+                      <td className="py-3.5 text-[#5C564F] font-mono text-[11px]">
+                        {new Date(log.entry_time).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                      </td>
+                      <td className="py-3.5 font-mono text-[11px]">
+                        {log.exit_time ? (
+                          <span className="text-[#5C564F]">{new Date(log.exit_time).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</span>
+                        ) : (
+                          <span className="text-[#A1713B] bg-[#F2ECD2] border border-[#E8DCB9] px-1.5 py-0.5 rounded font-sans font-bold text-[9px]">ON-SITE</span>
+                        )}
+                      </td>
+                      <td className="py-3.5 text-right">
+                        <Button
                           variant="ghost"
+                          size="sm"
                           onClick={() => viewVisitorInsights(log.request.visitor_phone, log.request.visitor_name)}
-                          className="text-indigo-400 hover:text-indigo-300 hover:bg-slate-800 h-8 rounded-lg cursor-pointer"
+                          className="text-[#4E8079] hover:text-[#3F6B65] hover:bg-[#4E8079]/5 h-8 rounded-lg cursor-pointer font-bold text-[11px]"
                         >
-                          <Info className="w-3.5 h-3.5 mr-1" />
-                          Insights
+                          <Info className="w-3.5 h-3.5 mr-1" strokeWidth={2} /> Profile Insights
                         </Button>
                       </td>
                     </tr>
@@ -766,217 +774,151 @@ export default function GuardDashboard() {
         </CardContent>
       </Card>
 
-      {/* QR SCANNER WEBCAM DIALOG */}
-      <Dialog open={scannerOpen} onOpenChange={(val) => {
-        setScannerOpen(val);
-        if (!val) stopCamera();
-      }}>
-        <DialogContent className="bg-slate-900 border-slate-800 text-slate-100 max-w-md rounded-3xl">
+      {/* SCANNER MODAL DIALOG */}
+      <Dialog open={scannerOpen} onOpenChange={(open) => { setScannerOpen(open); if(!open) stopCamera(); }}>
+        <DialogContent className="bg-[#E8E4DD] border border-[#F5F3F0] text-[#2A2825] max-w-lg rounded-[28px] shadow-[12px_12px_36px_rgba(0,0,0,0.15),-12px_-12px_36px_rgba(255,255,255,0.9)] p-6">
           <DialogHeader>
-            <DialogTitle className="text-slate-150 flex items-center gap-2">
-              <Scan className="w-5 h-5 text-emerald-400" />
-              Access Pass Camera Scanner
+            <DialogTitle className="text-[#2A2825] font-bold flex items-center gap-2 text-sm">
+              <div className="w-7 h-7 rounded-lg bg-[#F0EDE8] border border-white flex items-center justify-center shadow-xs">
+                <Scan className="w-4 h-4 text-[#4E8079]" strokeWidth={2} />
+              </div>
+              Gate Verification Node
             </DialogTitle>
-            <DialogDescription className="text-slate-500 text-xs">
-              Start camera to scan visitor badges, or enter codes manually.
+            <DialogDescription className="text-[#6E685E] text-xs pt-0.5">
+              Verify cryptographic secure access codes or run webcam parameter sweeps.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-6 pt-3 flex flex-col items-center">
-            {/* Visual Scanner Box */}
-            <div className="w-full aspect-video rounded-2xl bg-slate-950 border border-slate-850 relative overflow-hidden flex flex-col items-center justify-center">
-              {cameraActive ? (
-                <>
-                  <video 
-                    ref={videoRef}
-                    className="w-full h-full object-cover"
-                    playsInline
-                    muted
-                  />
-                  <div className="absolute inset-x-0 h-0.5 bg-emerald-500 shadow-[0_0_10px_#10b981] top-0 animate-scanner-bar" />
-                  
-                  {/* Camera overlay controls */}
-                  <div className="absolute bottom-3 flex gap-2">
-                    <Button 
-                      size="sm"
-                      onClick={stopCamera}
-                      className="bg-rose-500/80 hover:bg-rose-600 text-white font-bold rounded-lg text-[10px] cursor-pointer"
-                    >
-                      Stop Camera
-                    </Button>
-                    <Button 
-                      size="sm"
-                      onClick={switchCamera}
-                      className="bg-slate-900/85 hover:bg-slate-800 border border-slate-750 text-slate-200 font-bold rounded-lg text-[10px] cursor-pointer"
-                    >
-                      Switch Camera
-                    </Button>
+          <div className="space-y-4 pt-3">
+            {/* Real Webcam Stream Window */}
+            {cameraActive ? (
+              <div className="space-y-3">
+                <div className="relative bg-black rounded-2xl overflow-hidden aspect-video border border-[#DCD6CB] shadow-inner">
+                  <video ref={videoRef} className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 border-[30px] border-black/40 flex items-center justify-center">
+                    <div className="w-44 h-44 border-2 border-dashed border-[#4E8079] rounded-xl animate-pulse flex items-center justify-center">
+                      <span className="text-[9px] font-mono tracking-widest text-white/80 uppercase bg-black/60 px-2 py-0.5 rounded">Target Frame</span>
+                    </div>
                   </div>
-                </>
-              ) : scanning ? (
-                <>
-                  <div className="absolute inset-x-0 h-0.5 bg-emerald-500 shadow-[0_0_10px_#10b981] top-0 animate-scanner-bar" />
-                  <Camera className="w-10 h-10 text-emerald-500/40 animate-pulse" />
-                  <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest mt-3 animate-pulse">Scanning Pass...</span>
-                </>
-              ) : scannedRequest ? (
-                <div className="p-4 text-center space-y-2.5">
-                  <CheckCircle className="w-10 h-10 text-emerald-400 mx-auto" />
-                  <div>
-                    <h4 className="font-bold text-slate-200 text-sm">{scannedRequest.visitor_name}</h4>
-                    <p className="text-xs text-slate-400">Host Flat {scannedResident?.flat_number} ({scannedResident?.full_name})</p>
+                </div>
+                <div className="flex justify-between items-center gap-3">
+                  <span className="text-[10px] text-[#6E685E] font-medium block">Hardware feed mapped successfully.</span>
+                  <div className="flex gap-2">
+                    <Button type="button" size="sm" onClick={switchCamera} className="bg-[#F0EDE8] border border-[#DCD6CB] text-[#4A453F] font-bold text-[10px] h-7 rounded-lg cursor-pointer">Switch Cam</Button>
+                    <Button type="button" size="sm" onClick={stopCamera} className="bg-[#EADCDA] border border-[#D1AFA9] text-[#913B2E] font-bold text-[10px] h-7 rounded-lg cursor-pointer">Kill Stream</Button>
                   </div>
-                  <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] font-bold uppercase">
-                    PASS VERIFIED
-                  </Badge>
                 </div>
-              ) : scannedFrequentVisitor ? (
-                <div className="p-4 text-center space-y-2.5">
-                  <UserCheck2 className="w-10 h-10 text-emerald-400 mx-auto" />
-                  <div>
-                    <h4 className="font-bold text-slate-200 text-sm">{scannedFrequentVisitor.full_name}</h4>
-                    <p className="text-xs text-slate-400">Trusted Staff ({scannedFrequentVisitor.category}) • Flat {scannedResident?.flat_number}</p>
-                  </div>
-                  <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] font-bold uppercase">
-                    TRUSTED STAFF VERIFIED
-                  </Badge>
-                </div>
-              ) : (
-                <div className="text-center text-slate-600 space-y-3 p-4">
-                  <Scan className="w-10 h-10 mx-auto opacity-30 animate-pulse" />
-                  <p className="text-xs">Webcam Scanner is Off.</p>
-                  <Button 
-                    size="sm"
-                    onClick={() => startCamera(selectedDevice)}
-                    className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs py-1.5 px-3 rounded-lg cursor-pointer"
-                  >
-                    Start Device Camera
-                  </Button>
-                </div>
-              )}
-            </div>
-
-            {/* Input Pass Code */}
-            <div className="w-full space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                Gate Pass Code / Request ID
-              </label>
-              <div className="flex gap-2">
-                <Input
-                  type="text"
-                  placeholder="e.g. PASS-req-1-4920 or FREQ-COOK-..."
-                  value={scannedCode}
-                  onChange={(e) => setScannedCode(e.target.value)}
-                  disabled={scanning}
-                  className="bg-slate-950 border-slate-850 text-xs focus-visible:ring-emerald-500"
-                />
-                <Button 
-                  onClick={handleSimulateScan}
-                  disabled={scanning}
-                  className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs shrink-0 rounded-xl cursor-pointer"
-                >
-                  Verify Code
+              </div>
+            ) : (
+              <div className="p-6 rounded-2xl bg-[#F0EDE8] border border-[#DCD6CB] text-center space-y-2 shadow-[inset_1px_1px_4px_rgba(0,0,0,0.02)]">
+                <Camera className="w-6 h-6 text-[#9F988F] mx-auto" strokeWidth={1.8} />
+                <div className="text-xs font-bold text-[#2A2825]">Live Video Scanner Idle</div>
+                <p className="text-[11px] text-[#6E685E] max-w-xs mx-auto">Initialize internal hardware streams to automatically process incoming vehicle or visitor QR passes.</p>
+                <Button type="button" onClick={() => startCamera()} className="mt-1 bg-[#F0EDE8] hover:bg-[#DCD6CB]/60 text-[#4E8079] font-bold border border-[#DCD6CB] text-xs h-8 rounded-xl cursor-pointer shadow-xs">
+                  Activate Video Matrix
                 </Button>
               </div>
-              <span className="text-[9px] text-slate-500 block">
-                Tip: Copy a resident pass code or a trusted staff code (from `credentials.md`) and verify.
-              </span>
+            )}
+
+            {/* Simulated Code Entry Textbox */}
+            <div className="space-y-1.5">
+              <Label className="text-[10px] font-bold text-[#6E685E] uppercase tracking-wider block font-mono pl-0.5">Access Pass Code Reference</Label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    type="text"
+                    placeholder="e.g. PASS-req-1 or FREQ-qr-code"
+                    value={scannedCode}
+                    onChange={(e) => setScannedCode(e.target.value)}
+                    className="bg-[#F0EDE8] border border-[#DCD6CB] text-[#2A2825] placeholder:text-[#9F988F] text-xs rounded-xl py-4 h-10 shadow-[inset_1px_1px_4px_rgba(163,157,147,0.15)] focus-visible:ring-1 focus-visible:ring-[#4E8079]"
+                  />
+                </div>
+                <Button 
+                  type="button" 
+                  onClick={handleSimulateScan}
+                  disabled={scanning}
+                  className="bg-[#4E8079] text-white font-bold text-xs h-10 px-4 rounded-xl border border-[#6BA199] shadow-sm transition-all cursor-pointer"
+                >
+                  {scanning ? 'Verifying...' : 'Validate Code'}
+                </Button>
+              </div>
             </div>
 
-            {/* Action Check In */}
+            {/* Parsed Verification Result State Plates */}
             {scannedRequest && (
-              <Button
-                onClick={() => handleMarkEntry(scannedRequest.id)}
-                className="w-full bg-indigo-500 hover:bg-indigo-600 text-slate-950 font-extrabold py-5 rounded-xl transition-all shadow-lg cursor-pointer"
-              >
-                Log Check-In & Open Gate
-              </Button>
+              <div className="p-4 rounded-xl bg-[#D2E7E2] border border-[#B9D5CE] text-[#3B6660] space-y-2 shadow-xs">
+                <div className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 font-mono">✅ Standard Visitor Pass Verified</div>
+                <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] font-medium text-[#446E68]">
+                  <div>Visitor: <b className="text-[#2A2825]">{scannedRequest.visitor_name}</b></div>
+                  <div>Phone: <span className="font-mono text-[#2A2825]">{scannedRequest.visitor_phone}</span></div>
+                  <div>Flat Association: <b className="text-[#2A2825]">{scannedResident?.flat_number || 'TBD'}</b></div>
+                  <div>Category: <span className="font-mono text-[#2A2825]">{scannedRequest.visitor_type}</span></div>
+                </div>
+                <Button onClick={() => handleMarkEntry(scannedRequest.id)} className="w-full mt-1 bg-[#4E8079] text-white font-bold text-xs h-9 rounded-lg border border-[#6BA199]">
+                  Confirm Gate Entry Clearances
+                </Button>
+              </div>
             )}
 
             {scannedFrequentVisitor && (
-              <Button
-                onClick={() => handleCheckInFrequentVisitor(scannedFrequentVisitor.qr_code)}
-                className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold py-5 rounded-xl transition-all shadow-lg cursor-pointer"
-              >
-                Log Trusted Staff Entry
-              </Button>
+              <div className="p-4 rounded-xl bg-[#DCEBF2] border border-[#C2DFE8] text-[#477C94] space-y-2 shadow-xs">
+                <div className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 font-mono">🛡️ Trusted Community Staff Cleared</div>
+                <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] font-medium text-[#48788F]">
+                  <div>Staff Name: <b className="text-[#2A2825]">{scannedFrequentVisitor.full_name}</b></div>
+                  <div>Role Mapped: <span className="font-mono text-[#2A2825]">{scannedFrequentVisitor.category}</span></div>
+                  <div>Flat Node: <b className="text-[#2A2825]">{scannedResident?.flat_number || 'TBD'}</b></div>
+                  <div>Phone: <span className="font-mono text-[#2A2825]">{scannedFrequentVisitor.phone}</span></div>
+                </div>
+                <Button onClick={() => handleCheckInFrequentVisitor(scannedFrequentVisitor.qr_code)} className="w-full mt-1 bg-[#477C94] text-white font-bold text-xs h-9 rounded-lg border border-[#5CA4C4]">
+                  Log Auto-Approved Staff Entry
+                </Button>
+              </div>
             )}
           </div>
 
-          <DialogFooter className="mt-2 border-t border-slate-800/60 pt-4">
-            <Button 
-              onClick={() => {
-                setScannerOpen(false);
-                setScannedCode('');
-                setScannedRequest(null);
-                setScannedFrequentVisitor(null);
-                stopCamera();
-              }} 
-              className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-750"
-            >
-              Cancel Scan
+          <DialogFooter className="mt-4 pt-2 border-t border-[#DCD6CB]/60">
+            <Button onClick={() => { setScannerOpen(false); stopCamera(); }} className="w-full bg-[#F0EDE8] border border-[#DCD6CB] text-[#5C564F] text-xs h-9 rounded-xl font-bold">
+              Dismiss Console
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* VISITOR HISTORY INSIGHTS DIALOG */}
+      {/* HISTORICAL VISITOR INSIGHTS MODAL */}
       <Dialog open={insightsOpen} onOpenChange={setInsightsOpen}>
-        <DialogContent className="bg-slate-900 border-slate-800 text-slate-100 max-w-md rounded-3xl">
+        <DialogContent className="bg-[#E8E4DD] border border-[#F5F3F0] text-[#2A2825] max-w-md rounded-[28px] shadow-[12px_12px_36px_rgba(0,0,0,0.15),-12px_-12px_36px_rgba(255,255,255,0.9)] p-6">
           <DialogHeader>
-            <DialogTitle className="text-slate-150 flex items-center gap-2">
-              <UserCheck2 className="w-5 h-5 text-indigo-400" />
-              Visitor History & Insights
+            <DialogTitle className="text-[#2A2825] font-bold flex items-center gap-2 text-sm">
+              <div className="w-7 h-7 rounded-lg bg-[#F0EDE8] border border-white flex items-center justify-center shadow-xs">
+                <Info className="w-4 h-4 text-[#4E8079]" strokeWidth={2} />
+              </div>
+              Visitor Frequency Profile
             </DialogTitle>
-            <DialogDescription className="text-slate-500 text-xs">
-              Frequent visitor metrics and aggregate gate activities
-            </DialogDescription>
           </DialogHeader>
 
           {selectedVisitorInsights && (
-            <div className="space-y-4 pt-3 text-slate-350 text-xs">
-              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-850 flex items-center justify-between">
-                <div>
-                  <h4 className="font-extrabold text-sm text-slate-200">{selectedVisitorInsights.name}</h4>
-                  <span className="text-slate-500">{selectedVisitorInsights.phone}</span>
-                </div>
-                <div className="text-right">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Total Visits</span>
-                  <span className="text-2xl font-extrabold text-indigo-400">{selectedVisitorInsights.totalVisits}</span>
+            <div className="space-y-4 pt-3 text-xs">
+              <div className="p-3.5 rounded-xl bg-[#F0EDE8] border border-[#DCD6CB] space-y-1.5 shadow-[inset_1px_1px_3px_rgba(0,0,0,0.02)]">
+                <div className="font-bold text-[#2A2825] text-sm">{selectedVisitorInsights.name}</div>
+                <div className="font-mono text-[#6E685E]">{selectedVisitorInsights.phone}</div>
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[#DCD6CB] font-medium text-[#5C564F]">
+                  <div>Total On-Site Logs: <b className="text-[#2A2825] font-mono">{selectedVisitorInsights.totalVisits}</b></div>
+                  <div>First Initial Visit: <span className="text-[#2A2825] font-mono">{new Date(selectedVisitorInsights.firstVisit).toLocaleDateString()}</span></div>
                 </div>
               </div>
 
-              {/* Insights Stats Cards */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 rounded-2xl bg-slate-950/60 border border-slate-850/60">
-                  <span className="text-[9px] uppercase font-bold text-slate-500 block mb-1">First Visit</span>
-                  <span className="text-[10px] font-semibold text-slate-300">
-                    {new Date(selectedVisitorInsights.firstVisit).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
-                  </span>
-                </div>
-                <div className="p-3 rounded-2xl bg-slate-950/60 border border-slate-850/60">
-                  <span className="text-[9px] uppercase font-bold text-slate-500 block mb-1">Last Visit</span>
-                  <span className="text-[10px] font-semibold text-slate-300">
-                    {new Date(selectedVisitorInsights.lastVisit).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
-                  </span>
-                </div>
-              </div>
-
-              {/* Visit Logs Timeline */}
               <div className="space-y-2">
-                <h5 className="font-bold text-slate-400 text-[10px] uppercase tracking-wider">Recent Activity Timeline</h5>
-                <div className="space-y-2 max-h-[150px] overflow-y-auto pr-1">
+                <span className="text-[10px] font-bold text-[#6E685E] uppercase tracking-wider block font-mono pl-0.5">Chronological Trace Logs</span>
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                   {selectedVisitorInsights.visitsList.map((v: any, idx: number) => (
-                    <div key={idx} className="p-2.5 rounded-xl bg-slate-950/20 border border-slate-900/60 flex items-center justify-between">
+                    <div key={idx} className="p-2.5 rounded-lg bg-[#F0EDE8]/60 border border-[#DCD6CB]/80 flex items-center justify-between text-[11px]">
                       <div className="space-y-0.5">
-                        <span className="font-bold text-slate-200">Flat {v.residentFlat}</span>
-                        <span className="text-[9px] text-slate-550 block">Purpose: {v.request.purpose}</span>
+                        <span className="font-bold text-[#2A2825]">Flat {v.residentFlat}</span>
+                        <span className="text-[10px] text-[#6E685E] block truncate max-w-[160px]">Reason: {v.request.purpose}</span>
                       </div>
-                      <div className="text-right">
-                        <span className="text-[9px] text-slate-400 block">In: {new Date(v.entry_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                        <span className="text-[9px] text-slate-500 block">
-                          Out: {v.exit_time ? new Date(v.exit_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'On Site'}
-                        </span>
+                      <div className="text-right font-mono text-[10px] text-[#5C564F]">
+                        <span className="block">In: {new Date(v.entry_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span className="block text-[#8A8276]">{v.exit_time ? `Out: ${new Date(v.exit_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Active Inside'}</span>
                       </div>
                     </div>
                   ))}
@@ -985,13 +927,14 @@ export default function GuardDashboard() {
             </div>
           )}
 
-          <DialogFooter className="mt-2">
-            <Button onClick={() => setInsightsOpen(false)} className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-750 text-xs py-3 rounded-xl">
-              Close Insights
+          <DialogFooter className="mt-4 pt-2">
+            <Button onClick={() => setInsightsOpen(false)} className="w-full bg-[#F0EDE8] border border-[#DCD6CB] text-[#5C564F] text-xs h-9 rounded-xl font-bold">
+              Close Profile
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
     </div>
   );
 }

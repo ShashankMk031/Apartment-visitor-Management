@@ -73,6 +73,7 @@
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
   --radius: 0.625rem;
+  --teal: #4E8079;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -115,26 +116,74 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+  --base: #E8E4DD;
+  --surface: #F0EDE8;
+  --surface-up: #F5F2EE;
+  --shadow-dark: rgba(0, 0, 0, 0.13);
+  --shadow-light: rgba(255, 255, 255, 0.85);
+  --text-primary: #2A2825;
+  --text-secondary: #6B6760;
+  --text-muted: #9E9B96;
+  --teal: #4E8079;
+  --teal-light: #EBF4F2;
+  --radius: 20px;
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
+
   html {
     @apply font-sans;
   }
 }
 
 @keyframes scanner-bar {
-  0% { top: 0%; }
-  50% { top: 100%; }
-  100% { top: 0%; }
+  0% {
+    top: 0%;
+  }
+
+  50% {
+    top: 100%;
+  }
+
+  100% {
+    top: 0%;
+  }
 }
 
 @utility animate-scanner-bar {
   animation: scanner-bar 2.5s ease-in-out infinite;
+}
+
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.logo-icon {
+  border-radius: 100%;
+  background: var(--surface-up);
+  box-shadow: 3px 3px 8px var(--shadow-dark), -3px -3px 8px var(--shadow-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--teal);
+}
+
+.logo-text {
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.3px;
+}
+
+.logo-text span {
+  color: var(--teal);
 }

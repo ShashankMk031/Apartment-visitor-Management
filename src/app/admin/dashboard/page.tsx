@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { 
   Users, 
   ShieldAlert, 
@@ -28,7 +28,8 @@ import {
   Shield,
   HelpCircle,
   TrendingUp,
-  UserCheck2
+  UserCheck2,
+  RefreshCw
 } from 'lucide-react';
 import { mockDb, hasSupabaseCreds, VisitorRequest, VisitorEntry, Resident } from '@/lib/supabase/mockDb';
 import { createClient } from '@/lib/supabase/client';
@@ -267,8 +268,9 @@ export default function AdminDashboard() {
     ];
   };
 
-  const TYPE_COLORS = ['#10b981', '#6366f1', '#f59e0b', '#a855f7', '#3b82f6', '#ec4899', '#64748b'];
-  const APPROVAL_COLORS = ['#10b981', '#f43f5e'];
+  // Tactile color palette mappings for analytics charts
+  const TYPE_COLORS = ['#4E8079', '#6E8E89', '#A18E78', '#A1584E', '#8A8276', '#BD9B6D', '#7688A1'];
+  const APPROVAL_COLORS = ['#4E8079', '#A1584E'];
 
   // Reports Exporter
   const handleExportCSV = () => {
@@ -438,7 +440,6 @@ export default function AdminDashboard() {
   };
 
   const handleSimulateBlacklistAttempt = () => {
-    // Attempt gate request by a blacklisted visitor
     const mockRequest = {
       resident_id: 'res-1',
       visitor_name: 'Scammer Joe',
@@ -449,10 +450,8 @@ export default function AdminDashboard() {
       expected_duration: 30
     };
     
-    // Validate blacklist check
     const isBanned = mockDb.checkBlacklist(mockRequest.visitor_phone);
     if (isBanned) {
-      // Create rejected request to simulate blocker
       const requestsList = mockDb.getVisitorRequests();
       requestsList.unshift({
         id: `req-banned-${Date.now()}`,
@@ -463,7 +462,6 @@ export default function AdminDashboard() {
       });
       localStorage.setItem('mock_visitor_requests', JSON.stringify(requestsList));
       
-      // Log audit
       const logs = mockDb.getAuditLogs();
       logs.unshift({
         id: `log-${Date.now()}`,
@@ -499,25 +497,26 @@ export default function AdminDashboard() {
 
   const getEmergencyIcon = (type: string) => {
     switch (type) {
-      case 'MEDICAL': return <Activity className="w-4 h-4 text-rose-400" />;
-      case 'SECURITY': return <Shield className="w-4 h-4 text-rose-400" />;
-      case 'FIRE': return <Flame className="w-4 h-4 text-rose-400" />;
-      default: return <AlertTriangle className="w-4 h-4 text-rose-400" />;
+      case 'MEDICAL': return <Activity className="w-4 h-4 text-[#A1584E]" />;
+      case 'SECURITY': return <Shield className="w-4 h-4 text-[#A1584E]" />;
+      case 'FIRE': return <Flame className="w-4 h-4 text-[#A1584E]" />;
+      default: return <AlertTriangle className="w-4 h-4 text-[#A1584E]" />;
     }
   };
 
+  // Tactile Skeletons Frame
   if (skeletonLoading) {
     return (
-      <div className="space-y-6 animate-pulse">
-        <div className="h-8 bg-slate-900 rounded-lg w-1/3" />
-        <div className="grid grid-cols-4 gap-4">
+      <div className="space-y-6 bg-[#F0EDE8] p-2 min-h-screen animate-pulse">
+        <div className="h-9 bg-[#E8E4DD] border border-[#DCD6CB] rounded-xl w-1/3 shadow-sm" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-24 bg-slate-900 rounded-2xl" />
+            <div key={i} className="h-24 bg-[#E8E4DD] border border-[#DCD6CB] rounded-2xl shadow-inner" />
           ))}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-          <div className="md:col-span-8 h-[300px] bg-slate-900 rounded-2xl" />
-          <div className="md:col-span-4 h-[300px] bg-slate-900 rounded-2xl" />
+          <div className="md:col-span-8 h-[320px] bg-[#E8E4DD] border border-[#DCD6CB] rounded-[24px]" />
+          <div className="md:col-span-4 h-[320px] bg-[#E8E4DD] border border-[#DCD6CB] rounded-[24px]" />
         </div>
       </div>
     );
@@ -525,114 +524,122 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+      <div className="flex flex-col items-center justify-center min-h-[400px] bg-[#F0EDE8] rounded-[24px]">
+        <RefreshCw className="w-8 h-8 text-[#4E8079] animate-spin" strokeWidth={1.8} />
+        <span className="text-xs text-[#6E685E] font-medium mt-3 tracking-wide">Syncing Security Matrix...</span>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-100">System Analytics Console</h1>
-          <p className="text-sm text-slate-400">Green Glen Heights • Executive management dashboard</p>
-        </div>
+    <div className="space-y-6 bg-[#F0EDE8] text-[#2A2825] font-sans antialiased selection:bg-[#4E8079]/20 selection:text-[#4E8079]">
+      
+      {/* Page Branding Header */}
+      <div className="pb-5 border-b border-[#E0DACF]">
+        <h1 className="text-2xl font-bold tracking-tight text-[#2A2825]">System Analytics Console</h1>
+        <p className="text-xs text-[#6E685E] font-medium mt-0.5">Green Glen Heights • Executive management dashboard</p>
       </div>
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="bg-slate-950 border border-slate-850 p-1 rounded-xl w-full sm:w-auto overflow-x-auto mb-6">
-          <TabsTrigger value="overview" className="rounded-lg text-xs cursor-pointer">Overview & Analytics</TabsTrigger>
-          <TabsTrigger value="blacklist" className="rounded-lg text-xs cursor-pointer">Blacklist Management</TabsTrigger>
-          <TabsTrigger value="emergencies" className="rounded-lg text-xs cursor-pointer flex items-center gap-1">
+        {/* Soft Tactile Tab Switcher Bar */}
+        <TabsList className="bg-[#E8E4DD] border border-[#F5F3F0] p-1.5 rounded-2xl w-full sm:w-auto flex overflow-x-auto gap-1 shadow-[4px_4px_10px_rgba(163,157,147,0.2),-4px_-4px_10px_rgba(255,255,255,0.7)] mb-6">
+          <TabsTrigger value="overview" className="rounded-xl text-xs font-bold px-4 py-2 text-[#6E685E] data-[state=active]:bg-[#F0EDE8] data-[state=active]:text-[#2A2825] data-[state=active]:shadow-[inset_1px_1px_3px_rgba(163,157,147,0.15),2px_2px_5px_rgba(255,255,255,0.8)] border border-transparent data-[state=active]:border-[#F5F3F0] transition-all cursor-pointer">
+            Overview & Analytics
+          </TabsTrigger>
+          <TabsTrigger value="blacklist" className="rounded-xl text-xs font-bold px-4 py-2 text-[#6E685E] data-[state=active]:bg-[#F0EDE8] data-[state=active]:text-[#2A2825] data-[state=active]:shadow-[inset_1px_1px_3px_rgba(163,157,147,0.15),2px_2px_5px_rgba(255,255,255,0.8)] border border-transparent data-[state=active]:border-[#F5F3F0] transition-all cursor-pointer">
+            Blacklist Management
+          </TabsTrigger>
+          <TabsTrigger value="emergencies" className="rounded-xl text-xs font-bold px-4 py-2 text-[#6E685E] data-[state=active]:bg-[#F0EDE8] data-[state=active]:text-[#2A2825] data-[state=active]:shadow-[inset_1px_1px_3px_rgba(163,157,147,0.15),2px_2px_5px_rgba(255,255,255,0.8)] border border-transparent data-[state=active]:border-[#F5F3F0] transition-all cursor-pointer flex items-center gap-2">
             Emergency Desk 
             {emergencies.filter(e => e.status === 'ACTIVE').length > 0 && (
-              <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+              <span className="w-2 h-2 rounded-full bg-[#A1584E] animate-pulse" />
             )}
           </TabsTrigger>
-          <TabsTrigger value="demo" className="rounded-lg text-xs cursor-pointer">Demo Control Center</TabsTrigger>
+          <TabsTrigger value="demo" className="rounded-xl text-xs font-bold px-4 py-2 text-[#6E685E] data-[state=active]:bg-[#F0EDE8] data-[state=active]:text-[#2A2825] data-[state=active]:shadow-[inset_1px_1px_3px_rgba(163,157,147,0.15),2px_2px_5px_rgba(255,255,255,0.8)] border border-transparent data-[state=active]:border-[#F5F3F0] transition-all cursor-pointer">
+            Demo Control Center
+          </TabsTrigger>
         </TabsList>
 
         {/* TABS CONTENT: OVERVIEW & ANALYTICS */}
-        <TabsContent value="overview" className="space-y-6 m-0">
-          {/* Stats Cards */}
+        <TabsContent value="overview" className="space-y-6 m-0 focus-visible:outline-none">
+          {/* Neumorphic Metric Roster Grid */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card className="bg-slate-900/40 border-slate-800 shadow-md">
-              <CardContent className="pt-4 flex items-center justify-between">
-                <div className="space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total requests</span>
-                  <p className="text-2xl font-extrabold">{stats.totalRequests}</p>
+            <Card className="border border-[#F5F3F0] bg-[#E8E4DD] rounded-[22px] shadow-[6px_6px_16px_rgba(163,157,147,0.25),-6px_-6px_16px_rgba(255,255,255,0.8)] p-1">
+              <CardContent className="pt-4 px-4 pb-4 flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-[#8A8276] font-mono block">Total requests</span>
+                  <p className="text-2xl font-extrabold text-[#2A2825] tracking-tight tabular-nums">{stats.totalRequests}</p>
                 </div>
-                <div className="p-2.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-400">
-                  <Users className="w-5 h-5" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-slate-900/40 border-slate-800 shadow-md">
-              <CardContent className="pt-4 flex items-center justify-between">
-                <div className="space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Active On Site</span>
-                  <p className="text-2xl font-extrabold text-emerald-400">{stats.activeVisitors}</p>
-                </div>
-                <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-                  <Building className="w-5 h-5" />
+                <div className="w-9 h-9 rounded-xl bg-[#F0EDE8] border border-white flex items-center justify-center shadow-sm text-[#6E685E]">
+                  <Users className="w-4 h-4" strokeWidth={1.8} />
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-slate-900/40 border-slate-800 shadow-md">
-              <CardContent className="pt-4 flex items-center justify-between">
-                <div className="space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Approval Rate</span>
-                  <p className="text-2xl font-extrabold text-indigo-400">{stats.approvalRate}%</p>
+            <Card className="border border-[#F5F3F0] bg-[#E8E4DD] rounded-[22px] shadow-[6px_6px_16px_rgba(163,157,147,0.25),-6px_-6px_16px_rgba(255,255,255,0.8)] p-1">
+              <CardContent className="pt-4 px-4 pb-4 flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-[#8A8276] font-mono block">Active On Site</span>
+                  <p className="text-2xl font-extrabold text-[#4E8079] tracking-tight tabular-nums">{stats.activeVisitors}</p>
                 </div>
-                <div className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
-                  <CheckCircle className="w-5 h-5" />
+                <div className="w-9 h-9 rounded-xl bg-[#F0EDE8] border border-white flex items-center justify-center shadow-sm text-[#4E8079]">
+                  <Building className="w-4 h-4" strokeWidth={1.8} />
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-slate-900/40 border-slate-800 shadow-md">
-              <CardContent className="pt-4 flex items-center justify-between">
-                <div className="space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Avg. Stay Est</span>
-                  <p className="text-2xl font-extrabold text-amber-400">{stats.averageDuration}m</p>
+            <Card className="border border-[#F5F3F0] bg-[#E8E4DD] rounded-[22px] shadow-[6px_6px_16px_rgba(163,157,147,0.25),-6px_-6px_16px_rgba(255,255,255,0.8)] p-1">
+              <CardContent className="pt-4 px-4 pb-4 flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-[#8A8276] font-mono block">Approval Rate</span>
+                  <p className="text-2xl font-extrabold text-[#6E8E89] tracking-tight tabular-nums">{stats.approvalRate}%</p>
                 </div>
-                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
-                  <Clock className="w-5 h-5" />
+                <div className="w-9 h-9 rounded-xl bg-[#F0EDE8] border border-white flex items-center justify-center shadow-sm text-[#6E8E89]">
+                  <CheckCircle className="w-4 h-4" strokeWidth={1.8} />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border border-[#F5F3F0] bg-[#E8E4DD] rounded-[22px] shadow-[6px_6px_16px_rgba(163,157,147,0.25),-6px_-6px_16px_rgba(255,255,255,0.8)] p-1">
+              <CardContent className="pt-4 px-4 pb-4 flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-[#8A8276] font-mono block">Avg. Stay Est</span>
+                  <p className="text-2xl font-extrabold text-[#A18E78] tracking-tight tabular-nums">{stats.averageDuration}m</p>
+                </div>
+                <div className="w-9 h-9 rounded-xl bg-[#F0EDE8] border border-white flex items-center justify-center shadow-sm text-[#A18E78]">
+                  <Clock className="w-4 h-4" strokeWidth={1.8} />
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Charts Roster */}
+          {/* Core Analytics Charts Layer */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
             {/* Daily Volume Bar Chart */}
-            <Card className="lg:col-span-8 bg-slate-900/40 border-slate-800 shadow-md">
-              <CardHeader>
-                <CardTitle className="text-slate-200 text-sm">Daily Visitor Volume (Last 7 Days)</CardTitle>
+            <Card className="lg:col-span-8 border border-[#F5F3F0] bg-[#E8E4DD] rounded-[24px] shadow-[8px_8px_20px_rgba(163,157,147,0.25),-8px_-8px_20px_rgba(255,255,255,0.85)] p-2">
+              <CardHeader className="pt-4 px-4 pb-3">
+                <CardTitle className="text-[#2A2825] font-bold text-xs tracking-wide uppercase font-mono">Daily Visitor Volume (Last 7 Days)</CardTitle>
               </CardHeader>
-              <CardContent className="h-[250px]">
+              <CardContent className="h-[250px] px-2 pb-2">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={getDailyVisitorData()}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                    <XAxis dataKey="name" stroke="#64748b" fontSize={11} />
-                    <YAxis stroke="#64748b" fontSize={11} />
-                    <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc' }} />
-                    <Bar dataKey="visitors" fill="#10b981" radius={[4, 4, 0, 0]} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#DCD6CB" />
+                    <XAxis dataKey="name" stroke="#8A8276" fontSize={10} className="font-mono font-medium" tickLine={false} />
+                    <YAxis stroke="#8A8276" fontSize={10} className="font-mono font-medium" tickLine={false} />
+                    <Tooltip contentStyle={{ backgroundColor: '#E8E4DD', borderColor: '#DCD6CB', borderRadius: '12px', color: '#2A2825', fontSize: '11px', fontWeight: 'bold' }} />
+                    <Bar dataKey="visitors" fill="#4E8079" radius={[5, 5, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
 
-            {/* Approval Rate Pie Chart */}
-            <Card className="lg:col-span-4 bg-slate-900/40 border-slate-800 shadow-md">
-              <CardHeader>
-                <CardTitle className="text-slate-200 text-sm">Gate Approval Rate</CardTitle>
+            {/* Approval Rate Donut Pie Chart */}
+            <Card className="lg:col-span-4 border border-[#F5F3F0] bg-[#E8E4DD] rounded-[24px] shadow-[8px_8px_20px_rgba(163,157,147,0.25),-8px_-8px_20px_rgba(255,255,255,0.85)] p-2">
+              <CardHeader className="pt-4 px-4 pb-1">
+                <CardTitle className="text-[#2A2825] font-bold text-xs tracking-wide uppercase font-mono">Gate Approval Rate</CardTitle>
               </CardHeader>
-              <CardContent className="h-[250px] flex justify-center items-center relative">
+              <CardContent className="h-[250px] flex justify-center items-center relative pb-2">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -641,117 +648,110 @@ export default function AdminDashboard() {
                       cy="50%"
                       innerRadius={55}
                       outerRadius={75}
-                      paddingAngle={5}
+                      paddingAngle={4}
                       dataKey="value"
                     >
                       {getApprovalRateData().map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={APPROVAL_COLORS[index % APPROVAL_COLORS.length]} />
+                        <Cell key={`cell-${index}`} fill={APPROVAL_COLORS[index % APPROVAL_COLORS.length]} stroke="#E8E4DD" strokeWidth={2} />
                       ))}
                     </Pie>
-                    <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc' }} />
-                    <Legend verticalAlign="bottom" height={36} iconSize={8} iconType="circle" wrapperStyle={{ fontSize: '11px' }} />
+                    <Tooltip contentStyle={{ backgroundColor: '#E8E4DD', borderColor: '#DCD6CB', borderRadius: '12px', color: '#2A2825', fontSize: '11px' }} />
+                    <Legend verticalAlign="bottom" height={36} iconSize={8} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: '600', color: '#6E685E' }} />
                   </PieChart>
                 </ResponsiveContainer>
-                <div className="absolute flex flex-col items-center justify-center pointer-events-none">
-                  <span className="text-2xl font-black text-indigo-400">{stats.approvalRate}%</span>
-                  <span className="text-[9px] uppercase tracking-wider text-slate-550 font-bold">Approved</span>
+                <div className="absolute flex flex-col items-center justify-center pointer-events-none mt-[-16px]">
+                  <span className="text-xl font-black text-[#4E8079] tracking-tight">{stats.approvalRate}%</span>
+                  <span className="text-[8px] uppercase tracking-wider text-[#8A8276] font-bold font-mono">Approved</span>
                 </div>
               </CardContent>
             </Card>
 
             {/* Monthly Volume Line Chart */}
-            <Card className="lg:col-span-6 bg-slate-900/40 border-slate-800 shadow-md">
-              <CardHeader>
-                <CardTitle className="text-slate-200 text-sm">Monthly Visitor Volume (Last 6 Months)</CardTitle>
+            <Card className="lg:col-span-6 border border-[#F5F3F0] bg-[#E8E4DD] rounded-[24px] shadow-[8px_8px_20px_rgba(163,157,147,0.25),-8px_-8px_20px_rgba(255,255,255,0.85)] p-2">
+              <CardHeader className="pt-4 px-4 pb-3">
+                <CardTitle className="text-[#2A2825] font-bold text-xs tracking-wide uppercase font-mono">Monthly Visitor Volume (Last 6 Months)</CardTitle>
               </CardHeader>
-              <CardContent className="h-[250px]">
+              <CardContent className="h-[250px] px-2 pb-2">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={getMonthlyVisitorData()}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                    <XAxis dataKey="name" stroke="#64748b" fontSize={11} />
-                    <YAxis stroke="#64748b" fontSize={11} />
-                    <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc' }} />
-                    <Line type="monotone" dataKey="requests" stroke="#6366f1" strokeWidth={2} activeDot={{ r: 6 }} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#DCD6CB" />
+                    <XAxis dataKey="name" stroke="#8A8276" fontSize={10} tickLine={false} />
+                    <YAxis stroke="#8A8276" fontSize={10} tickLine={false} />
+                    <Tooltip contentStyle={{ backgroundColor: '#E8E4DD', borderColor: '#DCD6CB', borderRadius: '12px', color: '#2A2825', fontSize: '11px' }} />
+                    <Line type="monotone" dataKey="requests" stroke="#6E8E89" strokeWidth={2.5} dot={{ r: 4, stroke: '#E8E4DD', strokeWidth: 1 }} activeDot={{ r: 6 }} />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
 
-            {/* Visitor Type Pie Chart */}
-            <Card className="lg:col-span-6 bg-slate-900/40 border-slate-800 shadow-md">
-              <CardHeader>
-                <CardTitle className="text-slate-200 text-sm">Visitor Type Classification</CardTitle>
+            {/* Visitor Type Allocation Pie Chart */}
+            <Card className="lg:col-span-6 border border-[#F5F3F0] bg-[#E8E4DD] rounded-[24px] shadow-[8px_8px_20px_rgba(163,157,147,0.25),-8px_-8px_20px_rgba(255,255,255,0.85)] p-2">
+              <CardHeader className="pt-4 px-4 pb-3">
+                <CardTitle className="text-[#2A2825] font-bold text-xs tracking-wide uppercase font-mono">Visitor Type Classification</CardTitle>
               </CardHeader>
-              <CardContent className="h-[250px]">
+              <CardContent className="h-[250px] pb-2">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={getVisitorTypeData()}
                       cx="50%"
-                      cy="50%"
+                      cy="40%"
                       outerRadius={70}
                       label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
                       labelLine={false}
                       dataKey="value"
-                      style={{ fontSize: '10px', fill: '#cbd5e1', fontWeight: 'bold' }}
+                      style={{ fontSize: '10px', fill: '#4A453F', fontWeight: 'bold' }}
                     >
                       {getVisitorTypeData().map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={TYPE_COLORS[index % TYPE_COLORS.length]} />
+                        <Cell key={`cell-${index}`} fill={TYPE_COLORS[index % TYPE_COLORS.length]} stroke="#E8E4DD" strokeWidth={1.5} />
                       ))}
                     </Pie>
-                    <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc' }} />
+                    <Tooltip contentStyle={{ backgroundColor: '#E8E4DD', borderColor: '#DCD6CB', borderRadius: '12px', color: '#2A2825', fontSize: '11px' }} />
                   </PieChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
           </div>
 
-          {/* Reports Module */}
-          <Card className="bg-slate-900/40 border-slate-800 shadow-md no-print">
-            <CardHeader>
-              <CardTitle className="text-slate-200 text-sm flex items-center gap-2">
-                <CalendarDays className="w-4 h-4 text-emerald-400" />
+          {/* Compliance & Auditing Reports Module */}
+          <Card className="border border-[#F5F3F0] bg-[#E8E4DD] rounded-[24px] shadow-[8px_8px_20px_rgba(163,157,147,0.25),-8px_-8px_20px_rgba(255,255,255,0.85)] p-2 no-print">
+            <CardHeader className="pt-4 px-6 pb-2">
+              <CardTitle className="text-sm font-bold text-[#2A2825] flex items-center gap-2">
+                <CalendarDays className="w-4 h-4 text-[#4E8079]" strokeWidth={2} />
                 Executive Reports Module
               </CardTitle>
-              <CardDescription className="text-xs text-slate-550">Generate aggregated reports for compliance and auditing</CardDescription>
+              <CardDescription className="text-xs text-[#6E685E]">Generate aggregated ledger arrays for digital security audits.</CardDescription>
             </CardHeader>
             
-            <CardContent className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
-              <div className="flex gap-2 bg-slate-950 p-1.5 border border-slate-850 rounded-xl w-full sm:w-auto">
-                <button
-                  onClick={() => setReportType('daily')}
-                  className={`flex-1 sm:flex-initial px-4 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${reportType === 'daily' ? 'bg-emerald-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
-                >
-                  Daily Report
-                </button>
-                <button
-                  onClick={() => setReportType('weekly')}
-                  className={`flex-1 sm:flex-initial px-4 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${reportType === 'weekly' ? 'bg-emerald-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
-                >
-                  Weekly Report
-                </button>
-                <button
-                  onClick={() => setReportType('monthly')}
-                  className={`flex-1 sm:flex-initial px-4 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${reportType === 'monthly' ? 'bg-emerald-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
-                >
-                  Monthly Report
-                </button>
+            <CardContent className="px-6 pb-4 pt-2 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
+              {/* Filter Selector Row */}
+              <div className="flex gap-1.5 bg-[#F0EDE8] p-1 border border-[#DCD6CB] rounded-xl w-full sm:w-auto shadow-[inset_1px_1px_3px_rgba(163,157,147,0.1)]">
+                {(['daily', 'weekly', 'monthly'] as const).map((period) => (
+                  <button
+                    key={period}
+                    onClick={() => setReportType(period)}
+                    className={`flex-1 sm:flex-initial px-4 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer capitalize ${reportType === period ? 'bg-[#4E8079] text-white shadow-sm' : 'text-[#6E685E] hover:text-[#2A2825]'}`}
+                  >
+                    {period} Report
+                  </button>
+                ))}
               </div>
 
+              {/* Action Vectors */}
               <div className="flex gap-3 w-full sm:w-auto">
                 <Button
                   onClick={handleExportCSV}
-                  className="flex-1 sm:flex-initial bg-slate-950 hover:bg-slate-900 border border-slate-800 text-slate-200 hover:text-slate-100 gap-2 rounded-xl text-xs py-5 transition-colors cursor-pointer"
+                  className="flex-1 sm:flex-initial bg-[#F0EDE8] hover:bg-[#E8E4DD] border border-[#DCD6CB] text-[#2A2825] active:shadow-[inset_1px_1px_3px_rgba(0,0,0,0.1)] gap-2 rounded-xl text-xs py-5 h-10 shadow-sm transition-all cursor-pointer font-bold"
                 >
-                  <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+                  <FileSpreadsheet className="w-4 h-4 text-[#4E8079]" strokeWidth={2} />
                   <span>Export CSV</span>
                 </Button>
                 <Button
                   onClick={handleExportPDF}
-                  className="flex-1 sm:flex-initial bg-slate-950 hover:bg-slate-900 border border-slate-800 text-slate-200 hover:text-slate-100 gap-2 rounded-xl text-xs py-5 transition-colors cursor-pointer"
+                  className="flex-1 sm:flex-initial bg-[#F0EDE8] hover:bg-[#E8E4DD] border border-[#DCD6CB] text-[#2A2825] active:shadow-[inset_1px_1px_3px_rgba(0,0,0,0.1)] gap-2 rounded-xl text-xs py-5 h-10 shadow-sm transition-all cursor-pointer font-bold"
                 >
-                  <FileText className="w-4 h-4 text-indigo-400" />
-                  <span>Export PDF</span>
+                  <FileText className="w-4 h-4 text-[#A1584E]" strokeWidth={2} />
+                  <span>Print Ledger Pass</span>
                 </Button>
               </div>
             </CardContent>
@@ -759,23 +759,23 @@ export default function AdminDashboard() {
         </TabsContent>
 
         {/* TABS CONTENT: BLACKLIST MANAGEMENT */}
-        <TabsContent value="blacklist" className="space-y-4 m-0">
-          <Card className="bg-slate-900/40 border-slate-800 shadow-md">
-            <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4">
+        <TabsContent value="blacklist" className="space-y-4 m-0 focus-visible:outline-none">
+          <Card className="border border-[#F5F3F0] bg-[#E8E4DD] rounded-[24px] shadow-[8px_8px_20px_rgba(163,157,147,0.25),-8px_-8px_20px_rgba(255,255,255,0.85)] p-2">
+            <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-4 px-6 pb-4 border-b border-[#DCD6CB]/60">
               <div>
-                <CardTitle className="text-slate-200 text-sm">Visitor Blacklist</CardTitle>
-                <CardDescription className="text-xs text-slate-550">Banned visitors will be automatically blocked at gate check-in</CardDescription>
+                <CardTitle className="text-sm font-bold text-[#2A2825]">Visitor Blacklist Anchor</CardTitle>
+                <CardDescription className="text-xs text-[#6E685E]">Identified profiles will be rejected automatically at real-time gateway nodes.</CardDescription>
               </div>
               
               <div className="flex gap-3 w-full sm:w-auto">
                 <div className="relative flex-1 sm:w-60">
-                  <Search className="absolute left-2.5 top-3 w-4 h-4 text-slate-655" />
+                  <Search className="absolute left-3 top-2.5 w-4 h-4 text-[#9F988F]" strokeWidth={2} />
                   <Input
                     type="text"
-                    placeholder="Search blacklist..."
+                    placeholder="Search banned registry..."
                     value={blacklistSearch}
                     onChange={(e) => setBlacklistSearch(e.target.value)}
-                    className="bg-slate-950 border-slate-850 text-xs pl-9 text-slate-100 focus-visible:ring-emerald-500"
+                    className="bg-[#F0EDE8] border border-[#DCD6CB] text-xs pl-9 text-[#2A2825] placeholder:text-[#9F988F] rounded-xl h-9 shadow-[inset_1px_1px_4px_rgba(163,157,147,0.15)] focus-visible:ring-1 focus-visible:ring-[#4E8079]"
                   />
                 </div>
                 <Button 
@@ -783,43 +783,43 @@ export default function AdminDashboard() {
                     resetBlacklistForm();
                     setBlacklistOpen(true);
                   }}
-                  className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shrink-0"
+                  className="bg-[#A1584E] hover:bg-[#8D4A41] active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.2)] text-white font-bold rounded-xl text-xs h-9 flex items-center gap-1.5 cursor-pointer shrink-0 shadow-md border border-[#BD6A5F]"
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className="w-4 h-4" strokeWidth={2.2} />
                   Banish Visitor
                 </Button>
               </div>
             </CardHeader>
 
-            <CardContent>
+            <CardContent className="px-6 pt-4 pb-4">
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
-                    <tr className="border-b border-slate-800 text-slate-500">
-                      <th className="py-3 font-semibold">Banned Visitor</th>
-                      <th className="py-3 font-semibold">Phone Number</th>
-                      <th className="py-3 font-semibold">Reason for Blacklist</th>
-                      <th className="py-3 font-semibold">Created Date</th>
-                      <th className="py-3 font-semibold text-right">Actions</th>
+                    <tr className="border-b border-[#DCD6CB] text-[#8A8276] font-mono uppercase tracking-wider text-[10px]">
+                      <th className="py-3 font-bold">Banned Profile</th>
+                      <th className="py-3 font-bold">Communication Node</th>
+                      <th className="py-3 font-bold">Banishment Parameter</th>
+                      <th className="py-3 font-bold">Registry Date</th>
+                      <th className="py-3 font-bold text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-900 text-slate-350">
+                  <tbody className="divide-y divide-[#DCD6CB]/40 text-[#4A453F] font-medium">
                     {getFilteredBlacklist().length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="py-12 text-center text-slate-500">
-                          <UserX className="w-8 h-8 text-slate-750 mx-auto mb-2" />
-                          No blacklisted visitors logged
+                        <td colSpan={5} className="py-12 text-center text-[#8A8276]">
+                          <UserX className="w-8 h-8 text-[#BCB5AB] mx-auto mb-2" strokeWidth={1.5} />
+                          No blacklisted arrays initialized in this database block.
                         </td>
                       </tr>
                     ) : (
                       getFilteredBlacklist().map((b) => (
-                        <tr key={b.id} className="hover:bg-slate-905/20">
-                          <td className="py-3.5 font-bold text-slate-200">{b.full_name}</td>
-                          <td className="py-3.5 font-mono">{b.phone}</td>
-                          <td className="py-3.5 text-slate-400 leading-normal max-w-[200px] truncate" title={b.reason}>
+                        <tr key={b.id} className="hover:bg-[#F0EDE8]/40 transition-colors">
+                          <td className="py-3.5 font-bold text-[#2A2825]">{b.full_name}</td>
+                          <td className="py-3.5 font-mono text-[#5C564F]">{b.phone}</td>
+                          <td className="py-3.5 text-[#6E685E] leading-normal max-w-[220px] truncate" title={b.reason}>
                             {b.reason}
                           </td>
-                          <td className="py-3.5 text-slate-500">
+                          <td className="py-3.5 text-[#8A8276] font-mono">
                             {new Date(b.created_at).toLocaleDateString([], { dateStyle: 'medium' })}
                           </td>
                           <td className="py-3.5 text-right">
@@ -827,9 +827,9 @@ export default function AdminDashboard() {
                               size="sm"
                               variant="ghost"
                               onClick={() => handleRemoveBlacklist(b.id)}
-                              className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 h-8 rounded-lg cursor-pointer"
+                              className="text-[#4E8079] hover:text-[#3F6B65] hover:bg-[#4E8079]/10 h-8 rounded-lg cursor-pointer font-bold"
                             >
-                              <Trash2 className="w-3.5 h-3.5 mr-1" />
+                              <Trash2 className="w-3.5 h-3.5 mr-1" strokeWidth={2} />
                               Pardon
                             </Button>
                           </td>
@@ -844,61 +844,61 @@ export default function AdminDashboard() {
         </TabsContent>
 
         {/* TABS CONTENT: EMERGENCY DESK */}
-        <TabsContent value="emergencies" className="space-y-4 m-0">
-          <Card className="bg-slate-900/40 border-slate-800 shadow-md">
-            <CardHeader className="flex justify-between items-start pb-3 border-b border-slate-900">
+        <TabsContent value="emergencies" className="space-y-4 m-0 focus-visible:outline-none">
+          <Card className="border border-[#F5F3F0] bg-[#E8E4DD] rounded-[24px] shadow-[8px_8px_20px_rgba(163,157,147,0.25),-8px_-8px_20px_rgba(255,255,255,0.85)] p-2">
+            <CardHeader className="flex justify-between items-start pt-4 px-6 pb-3 border-b border-[#DCD6CB]/60">
               <div>
-                <CardTitle className="text-slate-200 text-sm flex items-center gap-2">
-                  <ShieldAlert className="w-5 h-5 text-rose-500" />
+                <CardTitle className="text-sm font-bold text-[#2A2825] flex items-center gap-2">
+                  <ShieldAlert className="w-4 h-4 text-[#A1584E]" strokeWidth={2} />
                   Emergency Security Desk
                 </CardTitle>
-                <CardDescription className="text-xs text-slate-550">Urgent emergency broadcasts generated by residents</CardDescription>
+                <CardDescription className="text-xs text-[#6E685E]">Urgent live distress beacons dispatched directly by structural tenants.</CardDescription>
               </div>
-              <Badge className="bg-rose-500/10 text-rose-400 border border-rose-500/20 text-[10px] font-bold">MONITORED</Badge>
+              <Badge className="bg-[#A1584E]/10 text-[#A1584E] border border-[#A1584E]/20 text-[9px] font-bold tracking-wider font-mono">MONITORED</Badge>
             </CardHeader>
 
-            <CardContent className="pt-4">
+            <CardContent className="px-6 pt-4 pb-4">
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
-                    <tr className="border-b border-slate-800 text-slate-550">
-                      <th className="py-3 font-semibold">Location (Flat)</th>
-                      <th className="py-3 font-semibold">Resident</th>
-                      <th className="py-3 font-semibold">Emergency Type</th>
-                      <th className="py-3 font-semibold">Triggered At</th>
-                      <th className="py-3 font-semibold">Status</th>
-                      <th className="py-3 font-semibold text-right">Actions</th>
+                    <tr className="border-b border-[#DCD6CB] text-[#8A8276] font-mono uppercase tracking-wider text-[10px]">
+                      <th className="py-3 font-bold">Location (Flat)</th>
+                      <th className="py-3 font-bold">Resident Token</th>
+                      <th className="py-3 font-bold">Emergency Vector</th>
+                      <th className="py-3 font-bold">Triggered Realtime</th>
+                      <th className="py-3 font-bold">State</th>
+                      <th className="py-3 font-bold text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-900 text-slate-350">
+                  <tbody className="divide-y divide-[#DCD6CB]/40 text-[#4A453F] font-medium">
                     {emergencies.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="py-12 text-center text-slate-500">
-                          <CheckCircle className="w-8 h-8 text-slate-750 mx-auto mb-2" />
-                          No emergency alerts triggered
+                        <td colSpan={6} className="py-12 text-center text-[#8A8276]">
+                          <CheckCircle className="w-8 h-8 text-[#BCB5AB] mx-auto mb-2" strokeWidth={1.5} />
+                          All gateway subsystems operate within baseline vectors. No triggers logged.
                         </td>
                       </tr>
                     ) : (
                       emergencies.map((e) => {
                         const res = residents.find(r => r.id === e.resident_id);
                         return (
-                          <tr key={e.id} className={`hover:bg-slate-905/20 ${e.status === 'ACTIVE' ? 'bg-rose-500/5' : ''}`}>
-                            <td className="py-4 font-bold text-slate-200">Flat {res?.flat_number || '101'}</td>
-                            <td className="py-4">{res?.full_name || 'Resident'}</td>
-                            <td className="py-4 font-bold">
-                              <span className="flex items-center gap-1.5 uppercase text-[10px] text-rose-400 tracking-wider">
+                          <tr key={e.id} className={`hover:bg-[#F0EDE8]/30 transition-colors ${e.status === 'ACTIVE' ? 'bg-[#A1584E]/5' : ''}`}>
+                            <td className="py-4 font-bold text-[#2A2825]">Flat {res?.flat_number || '101'}</td>
+                            <td className="py-4 font-medium text-[#5C564F]">{res?.full_name || 'Resident'}</td>
+                            <td className="py-4">
+                              <span className="flex items-center gap-1.5 uppercase text-[10px] text-[#A1584E] font-bold tracking-wider font-mono">
                                 {getEmergencyIcon(e.alert_type)}
                                 {e.alert_type}
                               </span>
                             </td>
-                            <td className="py-4 text-slate-500">
+                            <td className="py-4 text-[#6E685E] font-mono">
                               {new Date(e.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
                             </td>
                             <td className="py-4">
                               {e.status === 'ACTIVE' ? (
-                                <Badge className="bg-rose-500/10 text-rose-400 border border-rose-500/20 text-[9px] font-extrabold uppercase animate-pulse">ACTIVE</Badge>
+                                <Badge className="bg-[#A1584E] text-white border-none text-[9px] font-extrabold uppercase animate-pulse px-2 py-0.5 rounded-md shadow-sm">ACTIVE</Badge>
                               ) : (
-                                <Badge className="bg-slate-800 text-slate-400 border-none text-[9px] font-bold">RESOLVED</Badge>
+                                <Badge className="bg-[#DCD6CB] text-[#6E685E] border-none text-[9px] font-bold px-2 py-0.5 rounded-md">RESOLVED</Badge>
                               )}
                             </td>
                             <td className="py-4 text-right">
@@ -906,12 +906,12 @@ export default function AdminDashboard() {
                                 <Button
                                   size="sm"
                                   onClick={() => handleResolveEmergencyAdmin(e.id)}
-                                  className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs py-1 px-2.5 rounded-lg cursor-pointer"
+                                  className="bg-[#4E8079] hover:bg-[#3F6B65] active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.2)] text-white font-bold text-xs py-1 px-3 rounded-lg cursor-pointer border border-[#6BA199] shadow-sm"
                                 >
                                   Resolve Alert
                                 </Button>
                               ) : (
-                                <span className="text-[10px] text-slate-500 italic">Resolved</span>
+                                <span className="text-[10px] text-[#8A8276] font-mono italic">Archived</span>
                               )}
                             </td>
                           </tr>
@@ -926,71 +926,50 @@ export default function AdminDashboard() {
         </TabsContent>
 
         {/* TABS CONTENT: DEMO CONTROL CENTER */}
-        <TabsContent value="demo" className="space-y-6 m-0">
-          {/* Quick Roster counts */}
+        <TabsContent value="demo" className="space-y-6 m-0 focus-visible:outline-none">
+          {/* Quick Roster Counts Subgrid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card className="bg-slate-900/40 border-slate-800 shadow-md">
-              <CardContent className="pt-4 flex items-center justify-between">
-                <div className="space-y-1">
-                  <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Apartments</span>
-                  <p className="text-xl font-black text-slate-200">{demoStats.apartments}</p>
+            {[
+              { label: 'Apartments', value: demoStats.apartments, icon: <Building className="w-4 h-4 text-[#6E685E]" /> },
+              { label: 'Residents Registered', value: demoStats.residents, icon: <Users className="w-4 h-4 text-[#6E685E]" /> },
+              { label: 'Active Guards', value: demoStats.guards, icon: <UserCheck2 className="w-4 h-4 text-[#6E685E]" /> },
+              { label: 'Total Visits Logged', value: demoStats.visitors, icon: <TrendingUp className="w-4 h-4 text-[#6E685E]" /> },
+            ].map((d, index) => (
+              <Card key={index} className="bg-[#F0EDE8] border border-[#DCD6CB] rounded-xl shadow-[inset_1px_1px_4px_rgba(163,157,147,0.12)] p-3">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-[#8A8276] font-mono block">{d.label}</span>
+                    <p className="text-xl font-black text-[#2A2825] tracking-tight tabular-nums">{d.value}</p>
+                  </div>
+                  <div className="w-7 h-7 rounded-lg bg-[#E8E4DD] border border-white flex items-center justify-center shadow-xs">
+                    {d.icon}
+                  </div>
                 </div>
-                <Building className="w-5 h-5 text-slate-500" />
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-slate-900/40 border-slate-800 shadow-md">
-              <CardContent className="pt-4 flex items-center justify-between">
-                <div className="space-y-1">
-                  <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Residents</span>
-                  <p className="text-xl font-black text-slate-200">{demoStats.residents}</p>
-                </div>
-                <Users className="w-5 h-5 text-slate-500" />
-              </CardContent>
-            </Card>
-
-            <Card className="bg-slate-900/40 border-slate-800 shadow-md">
-              <CardContent className="pt-4 flex items-center justify-between">
-                <div className="space-y-1">
-                  <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Active Guards</span>
-                  <p className="text-xl font-black text-slate-200">{demoStats.guards}</p>
-                </div>
-                <UserCheck2 className="w-5 h-5 text-slate-500" />
-              </CardContent>
-            </Card>
-
-            <Card className="bg-slate-900/40 border-slate-800 shadow-md">
-              <CardContent className="pt-4 flex items-center justify-between">
-                <div className="space-y-1">
-                  <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Total Visits Logged</span>
-                  <p className="text-xl font-black text-slate-200">{demoStats.visitors}</p>
-                </div>
-                <TrendingUp className="w-5 h-5 text-slate-500" />
-              </CardContent>
-            </Card>
+              </Card>
+            ))}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Interactive Demo Triggers */}
-            <Card className="bg-slate-900/40 border-slate-800 shadow-md">
-              <CardHeader>
-                <CardTitle className="text-slate-200 text-sm">Interactive Sandbox Triggers</CardTitle>
-                <CardDescription className="text-xs text-slate-550">Simulate backend events instantly in Mock Mode</CardDescription>
+            {/* Interactive Demo Sandbox Operations */}
+            <Card className="border border-[#F5F3F0] bg-[#E8E4DD] rounded-[24px] shadow-[8px_8px_20px_rgba(163,157,147,0.25),-8px_-8px_20px_rgba(255,255,255,0.85)] p-2">
+              <CardHeader className="pt-4 px-6 pb-2">
+                <CardTitle className="text-xs font-bold text-[#2A2825] tracking-wide uppercase font-mono">Interactive Sandbox Triggers</CardTitle>
+                <CardDescription className="text-xs text-[#6E685E]">Inject immediate simulated events safely into the Mock operational matrix layer.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="px-6 pb-4 pt-2 space-y-4">
                 <div className="flex flex-col sm:flex-row gap-3">
                   <Button 
                     onClick={handleSimulateEmergencyDemo}
-                    className="flex-1 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-400 font-bold rounded-xl text-xs py-5 cursor-pointer"
+                    className="flex-1 bg-[#F0EDE8] text-[#A1584E] hover:bg-[#E8E4DD] border border-[#DCD6CB] font-bold rounded-xl text-xs py-5 h-11 transition-all cursor-pointer shadow-xs"
                   >
-                    <ShieldAlert className="w-4 h-4 mr-2" />
+                    <ShieldAlert className="w-4 h-4 mr-2" strokeWidth={2} />
                     Trigger Security Threat
                   </Button>
                   <Button 
                     onClick={handleSimulateBlacklistAttempt}
-                    className="flex-1 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-400 font-bold rounded-xl text-xs py-5 cursor-pointer"
+                    className="flex-1 bg-[#F0EDE8] text-[#A1584E] hover:bg-[#E8E4DD] border border-[#DCD6CB] font-bold rounded-xl text-xs py-5 h-11 transition-all cursor-pointer shadow-xs"
                   >
-                    <UserX className="w-4 h-4 mr-2" />
+                    <UserX className="w-4 h-4 mr-2" strokeWidth={2} />
                     Attempt Blacklisted Entry
                   </Button>
                 </div>
@@ -998,38 +977,38 @@ export default function AdminDashboard() {
                 <div className="flex flex-col sm:flex-row gap-3">
                   <Button 
                     onClick={handleTriggerSkeletonDemo}
-                    className="flex-1 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 text-indigo-400 font-bold rounded-xl text-xs py-5 cursor-pointer"
+                    className="flex-1 bg-[#4E8079] hover:bg-[#3F6B65] active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.2)] text-white font-bold rounded-xl text-xs py-5 h-11 transition-all cursor-pointer shadow-md border border-[#6BA199]"
                   >
-                    <Sparkles className="w-4 h-4 mr-2" />
+                    <Sparkles className="w-4 h-4 mr-2" strokeWidth={2} />
                     Simulate Loading Skeletons
                   </Button>
                   <Button 
                     onClick={handleResetLocalStorage}
-                    className="flex-1 bg-slate-950 hover:bg-slate-900 border border-slate-800 text-slate-400 font-bold rounded-xl text-xs py-5 cursor-pointer"
+                    className="flex-1 bg-[#F0EDE8] text-[#5C564F] hover:bg-[#DCD6CB]/80 border border-[#DCD6CB] font-bold rounded-xl text-xs py-5 h-11 transition-all cursor-pointer shadow-xs"
                   >
-                    <Database className="w-4 h-4 mr-2" />
+                    <Database className="w-4 h-4 mr-2" strokeWidth={2} />
                     Reset Mock Database
                   </Button>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Quick Demo System Guide */}
-            <Card className="bg-slate-900/40 border-slate-800 shadow-md">
-              <CardHeader>
-                <CardTitle className="text-slate-200 text-sm">Demo Guidelines</CardTitle>
+            {/* Tactical System Documentation Deck */}
+            <Card className="border border-[#F5F3F0] bg-[#E8E4DD] rounded-[24px] shadow-[8px_8px_20px_rgba(163,157,147,0.25),-8px_-8px_20px_rgba(255,255,255,0.85)] p-2">
+              <CardHeader className="pt-4 px-6 pb-2">
+                <CardTitle className="text-xs font-bold text-[#2A2825] tracking-wide uppercase font-mono">Demo Framework Guidelines</CardTitle>
               </CardHeader>
-              <CardContent className="text-xs text-slate-400 space-y-3 leading-relaxed">
-                <div className="flex gap-2.5">
-                  <HelpCircle className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" />
+              <CardContent className="px-6 pb-4 pt-2 text-xs text-[#5C564F] space-y-4 font-medium leading-relaxed">
+                <div className="flex gap-2.5 items-start">
+                  <HelpCircle className="w-4 h-4 text-[#4E8079] shrink-0 mt-0.5" strokeWidth={2.2} />
                   <p>
-                    **How to test emergencies**: Click the "Trigger Security Threat" button. You will instantly see a red emergency banner flash at the top of the dashboard shell (and on the Guard Dashboard!). Click "Resolve Alert" to dismiss.
+                    <strong>Distress Broadcast Simulator</strong>: Triggering a security alert instantiates a priority flag visible globally to physical guards on terminal access viewports. Dismiss via the resolving console row button.
                   </p>
                 </div>
-                <div className="flex gap-2.5">
-                  <HelpCircle className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                <div className="flex gap-2.5 items-start">
+                  <HelpCircle className="w-4 h-4 text-[#6E8E89] shrink-0 mt-0.5" strokeWidth={2.2} />
                   <p>
-                    **How to test blacklist**: Click "Attempt Blacklisted Entry". The system simulates a guest named "Scammer Joe" (+919000000000) checking in. Since Joe is on the blacklist, the gate portal blocks his entry attempt.
+                    <strong>Automated Gate Enforcer Check</strong>: Emulates an entry query originating from a banned terminal phone index. The local middleware intercepts the connection packet and records a rejected pass log.
                   </p>
                 </div>
               </CardContent>
@@ -1038,67 +1017,69 @@ export default function AdminDashboard() {
         </TabsContent>
       </Tabs>
 
-      {/* BLACKLIST ADD DIALOG */}
+      {/* DIALOG: TACTILE NEUMORPHIC BLACKLIST POPUP MODAL */}
       <Dialog open={blacklistOpen} onOpenChange={setBlacklistOpen}>
-        <DialogContent className="bg-slate-900 border-slate-800 text-slate-100 max-w-sm rounded-3xl">
-          <DialogHeader>
-            <DialogTitle className="text-slate-150 flex items-center gap-2 text-rose-500">
-              <UserX className="w-5 h-5" />
+        <DialogContent className="bg-[#E8E4DD] border border-[#F5F3F0] text-[#2A2825] max-w-sm rounded-[28px] shadow-[12px_12px_36px_rgba(0,0,0,0.15),-12px_-12px_36px_rgba(255,255,255,0.9)] p-6">
+          <DialogHeader className="space-y-1">
+            <DialogTitle className="text-[#2A2825] font-bold flex items-center gap-2 text-sm">
+              <div className="w-7 h-7 rounded-lg bg-[#F0EDE8] border border-white flex items-center justify-center shadow-xs">
+                <UserX className="w-4 h-4 text-[#A1584E]" strokeWidth={2} />
+              </div>
               Blacklist Visitor Profile
             </DialogTitle>
-            <DialogDescription className="text-slate-500 text-xs">
-              Blacklisted visitors are blocked from creating gate entry passes.
+            <DialogDescription className="text-[#6E685E] text-xs pt-0.5">
+              Profiles registered here are isolated from establishing secure gate passes.
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleAddBlacklist} className="space-y-4 pt-3">
+          <form onSubmit={handleAddBlacklist} className="space-y-4 pt-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-400">Visitor Full Name</label>
+              <label className="text-[10px] font-bold text-[#6E685E] uppercase tracking-wider block font-mono pl-0.5">Visitor Full Name</label>
               <Input
                 type="text"
                 placeholder="e.g. Scammer Joe"
                 value={blackName}
                 onChange={(e) => setBlackName(e.target.value)}
-                className="bg-slate-950 border-slate-850 text-xs text-slate-100 focus-visible:ring-rose-500 focus-visible:border-rose-500"
+                className="bg-[#F0EDE8] border border-[#DCD6CB] text-[#2A2825] placeholder:text-[#9F988F] text-xs rounded-xl py-4 h-10 px-3.5 shadow-[inset_1px_1px_4px_rgba(163,157,147,0.15)] focus-visible:ring-1 focus-visible:ring-[#A1584E]"
                 required
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-400">Phone Number</label>
+              <label className="text-[10px] font-bold text-[#6E685E] uppercase tracking-wider block font-mono pl-0.5">Phone Number Index</label>
               <Input
                 type="text"
                 placeholder="e.g. +919000000000"
                 value={blackPhone}
                 onChange={(e) => setBlackPhone(e.target.value)}
-                className="bg-slate-950 border-slate-850 text-xs text-slate-100 focus-visible:ring-rose-500 focus-visible:border-rose-500"
+                className="bg-[#F0EDE8] border border-[#DCD6CB] text-xs text-[#2A2825] placeholder:text-[#9F988F] font-mono rounded-xl py-4 h-10 px-3.5 shadow-[inset_1px_1px_4px_rgba(163,157,147,0.15)] focus-visible:ring-1 focus-visible:ring-[#A1584E]"
                 required
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-400">Reason for Banishment</label>
+              <label className="text-[10px] font-bold text-[#6E685E] uppercase tracking-wider block font-mono pl-0.5">Reason for Banishment</label>
               <Input
                 type="text"
-                placeholder="e.g. Trespassing, bad behavior"
+                placeholder="e.g. Trespassing parameter violation"
                 value={blackReason}
                 onChange={(e) => setBlackReason(e.target.value)}
-                className="bg-slate-950 border-slate-850 text-xs text-slate-100 focus-visible:ring-rose-500 focus-visible:border-rose-500"
+                className="bg-[#F0EDE8] border border-[#DCD6CB] text-xs text-[#2A2825] placeholder:text-[#9F988F] rounded-xl py-4 h-10 px-3.5 shadow-[inset_1px_1px_4px_rgba(163,157,147,0.15)] focus-visible:ring-1 focus-visible:ring-[#A1584E]"
                 required
               />
             </div>
 
-            <DialogFooter className="mt-4 flex gap-2">
+            <DialogFooter className="mt-6 flex gap-3 sm:space-x-0">
               <Button 
                 type="button" 
                 onClick={() => setBlacklistOpen(false)}
-                className="w-1/2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-750 text-xs py-3"
+                className="w-1/2 bg-[#F0EDE8] hover:bg-[#DCD6CB]/60 text-[#5C564F] font-bold border border-[#DCD6CB] text-xs h-10 rounded-xl"
               >
                 Cancel
               </Button>
               <Button 
                 type="submit" 
-                className="w-1/2 bg-rose-500 hover:bg-rose-600 text-slate-950 font-bold text-xs py-3 cursor-pointer"
+                className="w-1/2 bg-[#A1584E] hover:bg-[#8D4A41] active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.2)] text-white font-bold text-xs h-10 rounded-xl border border-[#BD6A5F] shadow-sm cursor-pointer"
               >
                 Banish Visitor
               </Button>
