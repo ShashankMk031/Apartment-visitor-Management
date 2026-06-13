@@ -78,6 +78,37 @@ export interface AuditLog {
   created_at: string;
 }
 
+export interface FrequentVisitor {
+  id: string;
+  resident_id: string;
+  full_name: string;
+  phone: string;
+  category: 'MAID' | 'DRIVER' | 'COOK' | 'PARENTS' | 'RELATIVES' | 'HELP' | 'TRAINER' | 'OTHER';
+  notes?: string;
+  qr_code: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface BlacklistedVisitor {
+  id: string;
+  full_name: string;
+  phone: string;
+  reason: string;
+  created_by: string;
+  created_at: string;
+}
+
+export interface EmergencyAlert {
+  id: string;
+  resident_id: string;
+  alert_type: 'MEDICAL' | 'SECURITY' | 'FIRE' | 'OTHER';
+  status: 'ACTIVE' | 'RESOLVED';
+  resolved_by?: string;
+  resolved_at?: string;
+  created_at: string;
+}
+
 // Check if credentials exist
 export const hasSupabaseCreds = () => {
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -166,6 +197,84 @@ const INITIAL_VISITOR_REQUESTS: VisitorRequest[] = [];
 const INITIAL_VISITOR_ENTRIES: VisitorEntry[] = [];
 const INITIAL_AUDIT_LOGS: AuditLog[] = [];
 const INITIAL_NOTIFICATIONS: Notification[] = [];
+
+const INITIAL_FREQUENT_VISITORS: FrequentVisitor[] = [
+  {
+    id: 'freq-1',
+    resident_id: 'res-1',
+    full_name: 'Raju Milkman',
+    phone: '+919988770011',
+    category: 'COOK',
+    notes: 'Comes daily in the morning at 7 AM',
+    qr_code: 'FREQ-MILK-101-9988',
+    is_active: true,
+    created_at: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'freq-2',
+    resident_id: 'res-1',
+    full_name: 'Shanti Maid',
+    phone: '+919988770022',
+    category: 'MAID',
+    notes: 'Comes in the afternoon at 2 PM',
+    qr_code: 'FREQ-MAID-101-7766',
+    is_active: true,
+    created_at: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'freq-3',
+    resident_id: 'res-2',
+    full_name: 'Ramesh Driver',
+    phone: '+919988770033',
+    category: 'DRIVER',
+    notes: 'Sunday driver',
+    qr_code: 'FREQ-DRIV-102-5544',
+    is_active: true,
+    created_at: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'freq-4',
+    resident_id: 'res-6',
+    full_name: 'Lata Cook',
+    phone: '+919988770044',
+    category: 'COOK',
+    notes: 'Cooks dinner daily',
+    qr_code: 'FREQ-COOK-201-1122',
+    is_active: false,
+    created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+  }
+];
+
+const INITIAL_BLACKLIST: BlacklistedVisitor[] = [
+  {
+    id: 'black-1',
+    full_name: 'Scammer Joe',
+    phone: '+919000000000',
+    reason: 'Suspicious marketing activities inside the building',
+    created_by: 'admin-id',
+    created_at: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'black-2',
+    full_name: 'Rude Delivery Rider',
+    phone: '+919111111111',
+    reason: 'Altercation with guards at the main gate',
+    created_by: 'admin-id',
+    created_at: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+  }
+];
+
+const INITIAL_EMERGENCY_ALERTS: EmergencyAlert[] = [
+  {
+    id: 'alert-1',
+    resident_id: 'res-1',
+    alert_type: 'MEDICAL',
+    status: 'RESOLVED',
+    resolved_by: 'guard-1',
+    resolved_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+    created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000 - 30 * 60 * 1000).toISOString(),
+  }
+];
 
 // Helper to generate a date offset
 const getDateOffset = (daysAgo: number, hourOffset: number) => {
@@ -644,6 +753,303 @@ class MockDatabase {
     let profiles = this.getProfiles();
     profiles = profiles.filter(p => p.id !== id);
     this.setStorage('mock_profiles', profiles);
+  }
+
+  // Frequent Visitors Operations
+  public getFrequentVisitors(): FrequentVisitor[] {
+    return this.getStorage('mock_frequent_visitors', INITIAL_FREQUENT_VISITORS);
+  }
+
+  public addFrequentVisitor(visitor: Omit<FrequentVisitor, 'id' | 'qr_code' | 'is_active' | 'created_at'>): FrequentVisitor {
+    const list = this.getFrequentVisitors();
+    const newVisitor: FrequentVisitor = {
+      ...visitor,
+      id: `freq-${Date.now()}`,
+      qr_code: `FREQ-${visitor.category.substring(0, 4)}-${visitor.phone.substring(visitor.phone.length - 4)}-${Math.floor(1000 + Math.random() * 9000)}`,
+      is_active: true,
+      created_at: new Date().toISOString(),
+    };
+    list.unshift(newVisitor);
+    this.setStorage('mock_frequent_visitors', list);
+
+    // Audit Log
+    const logs = this.getAuditLogs();
+    const profiles = this.getProfiles();
+    const actor = profiles.find(p => p.id === visitor.resident_id);
+    logs.unshift({
+      id: `log-${Date.now()}`,
+      actor_id: visitor.resident_id,
+      actor_name: actor?.full_name || 'Resident',
+      action_type: 'ADMIN_ACTION',
+      description: `Created frequent visitor ${newVisitor.full_name} (${newVisitor.category})`,
+      created_at: new Date().toISOString(),
+    });
+    this.setStorage('mock_audit_logs', logs);
+
+    return newVisitor;
+  }
+
+  public updateFrequentVisitor(id: string, updates: Partial<Omit<FrequentVisitor, 'id' | 'resident_id' | 'qr_code' | 'created_at'>>): FrequentVisitor | null {
+    const list = this.getFrequentVisitors();
+    const idx = list.findIndex(v => v.id === id);
+    if (idx === -1) return null;
+
+    const updated = { ...list[idx], ...updates };
+    list[idx] = updated;
+    this.setStorage('mock_frequent_visitors', list);
+
+    // Audit Log
+    const logs = this.getAuditLogs();
+    const profiles = this.getProfiles();
+    const actor = profiles.find(p => p.id === updated.resident_id);
+    logs.unshift({
+      id: `log-${Date.now()}`,
+      actor_id: updated.resident_id,
+      actor_name: actor?.full_name || 'Resident',
+      action_type: 'ADMIN_ACTION',
+      description: `Updated frequent visitor ${updated.full_name} (${updated.category}) - Active: ${updated.is_active}`,
+      created_at: new Date().toISOString(),
+    });
+    this.setStorage('mock_audit_logs', logs);
+
+    return updated;
+  }
+
+  public deleteFrequentVisitor(id: string): boolean {
+    let list = this.getFrequentVisitors();
+    const target = list.find(v => v.id === id);
+    if (!target) return false;
+
+    list = list.filter(v => v.id !== id);
+    this.setStorage('mock_frequent_visitors', list);
+
+    // Audit Log
+    const logs = this.getAuditLogs();
+    const profiles = this.getProfiles();
+    const actor = profiles.find(p => p.id === target.resident_id);
+    logs.unshift({
+      id: `log-${Date.now()}`,
+      actor_id: target.resident_id,
+      actor_name: actor?.full_name || 'Resident',
+      action_type: 'ADMIN_ACTION',
+      description: `Deleted frequent visitor ${target.full_name}`,
+      created_at: new Date().toISOString(),
+    });
+    this.setStorage('mock_audit_logs', logs);
+
+    return true;
+  }
+
+  // Blacklist Operations
+  public getBlacklist(): BlacklistedVisitor[] {
+    return this.getStorage('mock_blacklist', INITIAL_BLACKLIST);
+  }
+
+  public addBlacklistedVisitor(visitor: Omit<BlacklistedVisitor, 'id' | 'created_at'>): BlacklistedVisitor {
+    const list = this.getBlacklist();
+    const newVisitor: BlacklistedVisitor = {
+      ...visitor,
+      id: `black-${Date.now()}`,
+      created_at: new Date().toISOString(),
+    };
+    list.unshift(newVisitor);
+    this.setStorage('mock_blacklist', list);
+
+    // Audit Log
+    const logs = this.getAuditLogs();
+    const profiles = this.getProfiles();
+    const actor = profiles.find(p => p.id === visitor.created_by);
+    logs.unshift({
+      id: `log-${Date.now()}`,
+      actor_id: visitor.created_by,
+      actor_name: actor?.full_name || 'Admin',
+      action_type: 'ADMIN_ACTION',
+      description: `Added visitor ${visitor.full_name} (${visitor.phone}) to blacklist. Reason: ${visitor.reason}`,
+      created_at: new Date().toISOString(),
+    });
+    this.setStorage('mock_audit_logs', logs);
+
+    return newVisitor;
+  }
+
+  public removeBlacklistedVisitor(id: string, adminId: string): boolean {
+    let list = this.getBlacklist();
+    const target = list.find(v => v.id === id);
+    if (!target) return false;
+
+    list = list.filter(v => v.id !== id);
+    this.setStorage('mock_blacklist', list);
+
+    // Audit Log
+    const logs = this.getAuditLogs();
+    const profiles = this.getProfiles();
+    const actor = profiles.find(p => p.id === adminId);
+    logs.unshift({
+      id: `log-${Date.now()}`,
+      actor_id: adminId,
+      actor_name: actor?.full_name || 'Admin',
+      action_type: 'ADMIN_ACTION',
+      description: `Removed visitor ${target.full_name} (${target.phone}) from blacklist`,
+      created_at: new Date().toISOString(),
+    });
+    this.setStorage('mock_audit_logs', logs);
+
+    return true;
+  }
+
+  public checkBlacklist(phone: string): BlacklistedVisitor | null {
+    const list = this.getBlacklist();
+    return list.find(v => v.phone === phone) || null;
+  }
+
+  // Emergency Alerts Operations
+  public getEmergencyAlerts(): EmergencyAlert[] {
+    return this.getStorage('mock_emergency_alerts', INITIAL_EMERGENCY_ALERTS);
+  }
+
+  public triggerEmergencyAlert(residentId: string, alertType: EmergencyAlert['alert_type']): EmergencyAlert {
+    const list = this.getEmergencyAlerts();
+    const newAlert: EmergencyAlert = {
+      id: `alert-${Date.now()}`,
+      resident_id: residentId,
+      alert_type: alertType,
+      status: 'ACTIVE',
+      created_at: new Date().toISOString(),
+    };
+    list.unshift(newAlert);
+    this.setStorage('mock_emergency_alerts', list);
+
+    // Get resident flat info
+    const resident = this.getResidents().find(r => r.id === residentId);
+    const flatNo = resident ? resident.flat_number : 'Unknown Flat';
+    const residentName = resident ? resident.full_name : 'Resident';
+
+    // Log check-in audit
+    const logs = this.getAuditLogs();
+    logs.unshift({
+      id: `log-${Date.now()}`,
+      actor_id: residentId,
+      actor_name: residentName,
+      action_type: 'ADMIN_ACTION',
+      description: `⚠️ EMERGENCY ALERT: ${alertType} triggered at Flat ${flatNo}`,
+      created_at: new Date().toISOString(),
+    });
+    this.setStorage('mock_audit_logs', logs);
+
+    // Add alert notification for guards and admins
+    const notifs = this.getNotifications();
+    const guards = this.getProfiles().filter(p => p.role === 'GUARD' || p.role === 'ADMIN');
+    guards.forEach(g => {
+      notifs.unshift({
+        id: `notif-${Date.now()}-${Math.random()}`,
+        recipient_id: g.id,
+        title: `🚨 EMERGENCY ALERT: ${alertType}`,
+        message: `${residentName} from Flat ${flatNo} has triggered a ${alertType} alert. Action required!`,
+        read: false,
+        created_at: new Date().toISOString(),
+      });
+    });
+    this.setStorage('mock_notifications', notifs);
+
+    return newAlert;
+  }
+
+  public resolveEmergencyAlert(id: string, guardId: string): EmergencyAlert | null {
+    const list = this.getEmergencyAlerts();
+    const idx = list.findIndex(a => a.id === id);
+    if (idx === -1) return null;
+
+    const alert = list[idx];
+    alert.status = 'RESOLVED';
+    alert.resolved_by = guardId;
+    alert.resolved_at = new Date().toISOString();
+
+    list[idx] = alert;
+    this.setStorage('mock_emergency_alerts', list);
+
+    // Audit Log
+    const guard = this.getProfiles().find(p => p.id === guardId);
+    const resident = this.getResidents().find(r => r.id === alert.resident_id);
+    const flatNo = resident ? resident.flat_number : 'Unknown Flat';
+
+    const logs = this.getAuditLogs();
+    logs.unshift({
+      id: `log-${Date.now()}`,
+      actor_id: guardId,
+      actor_name: guard?.full_name || 'Guard',
+      action_type: 'ADMIN_ACTION',
+      description: `Resolved ${alert.alert_type} emergency alert for Flat ${flatNo}`,
+      created_at: new Date().toISOString(),
+    });
+    this.setStorage('mock_audit_logs', logs);
+
+    return alert;
+  }
+
+  // Check in Frequent Visitor scanner endpoint
+  public checkInFrequentVisitor(qrCode: string, guardId: string): { entry: any; request: any; error?: string } {
+    const list = this.getFrequentVisitors();
+    const visitor = list.find(v => v.qr_code === qrCode);
+    if (!visitor) {
+      return { entry: null, request: null, error: 'Invalid QR code' };
+    }
+    if (!visitor.is_active) {
+      return { entry: null, request: null, error: 'Frequent visitor profile is deactivated' };
+    }
+
+    // Check blacklist
+    if (this.checkBlacklist(visitor.phone)) {
+      return { entry: null, request: null, error: 'Visitor is blacklisted and blocked' };
+    }
+
+    // Create a visitor request that is automatically approved
+    const requests = this.getVisitorRequests();
+    
+    // Map category to standard visitor_type
+    let type: any = 'OTHER';
+    if (visitor.category === 'MAID') type = 'MAID';
+    else if (visitor.category === 'DRIVER') type = 'DRIVER';
+    else if (visitor.category === 'COOK' || visitor.category === 'HELP') type = 'MAINTENANCE';
+    else if (visitor.category === 'PARENTS' || visitor.category === 'RELATIVES') type = 'FAMILY';
+
+    const reqId = `req-freq-${Date.now()}`;
+    const newReq: VisitorRequest = {
+      id: reqId,
+      resident_id: visitor.resident_id,
+      visitor_name: visitor.full_name,
+      visitor_phone: visitor.phone,
+      visitor_type: type,
+      purpose: `Trusted entry (${visitor.category})`,
+      number_of_visitors: 1,
+      expected_duration: 180,
+      status: 'APPROVED',
+      approval_time: new Date().toISOString(),
+      qr_code_pass: qrCode,
+      created_at: new Date().toISOString(),
+    };
+
+    requests.unshift(newReq);
+    this.setStorage('mock_visitor_requests', requests);
+
+    // Now mark entry
+    const entry = this.markVisitorEntry(reqId, guardId);
+    if (!entry) {
+      return { entry: null, request: newReq, error: 'Failed to record entry log' };
+    }
+
+    return { entry, request: newReq };
+  }
+
+  public createAuditLog(log: Omit<AuditLog, 'id' | 'created_at'>): AuditLog {
+    const logs = this.getAuditLogs();
+    const newLog: AuditLog = {
+      ...log,
+      id: `log-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      created_at: new Date().toISOString()
+    };
+    logs.unshift(newLog);
+    this.setStorage('mock_audit_logs', logs);
+    return newLog;
   }
 }
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { 
@@ -43,7 +43,32 @@ export default function DashboardShell({ children }: DashboardShellProps) {
   const [loading, setLoading] = useState(true);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [activeEmergencyAlerts, setActiveEmergencyAlerts] = useState<any[]>([]);
   const [notifOpen, setNotifOpen] = useState(false);
+  const prevNotifsCountRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      if (Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+    }
+  }, []);
+
+  const triggerBrowserNotification = (title: string, body: string) => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      if (Notification.permission === 'granted') {
+        const notification = new Notification(title, {
+          body,
+          icon: '/favicon.ico',
+        });
+        notification.onclick = () => {
+          window.focus();
+          setNotifOpen(true);
+        };
+      }
+    }
+  };
 
   const fetchUserAndNotifications = async () => {
     try {
@@ -51,10 +76,25 @@ export default function DashboardShell({ children }: DashboardShellProps) {
         const current = mockDb.getCurrentUser();
         if (current) {
           setUser(current);
-          if (current.role === 'RESIDENT') {
-            const list = mockDb.getNotifications().filter(n => n.recipient_id === current.id);
-            setNotifications(list);
-            setUnreadNotifications(list.filter(n => !n.read).length);
+          const list = mockDb.getNotifications().filter(n => n.recipient_id === current.id);
+          setNotifications(list);
+          setUnreadNotifications(list.filter(n => !n.read).length);
+          
+          if (prevNotifsCountRef.current > 0 && list.length > prevNotifsCountRef.current) {
+            const newCount = list.length - prevNotifsCountRef.current;
+            for (let i = 0; i < newCount; i++) {
+              const newNotif = list[i];
+              if (newNotif && !newNotif.read) {
+                toast.info(`New Alert: ${newNotif.title}`);
+                triggerBrowserNotification(newNotif.title, newNotif.message);
+              }
+            }
+          }
+          prevNotifsCountRef.current = list.length;
+
+          if (current.role === 'GUARD' || current.role === 'ADMIN') {
+            const alerts = mockDb.getEmergencyAlerts().filter(a => a.status === 'ACTIVE');
+            setActiveEmergencyAlerts(alerts);
           }
         } else {
           router.push('/login');
@@ -75,7 +115,6 @@ export default function DashboardShell({ children }: DashboardShellProps) {
             };
             setUser(curUser);
 
-            // Fetch notifications
             const { data: list } = await supabase
               .from('notifications')
               .select('*')
@@ -85,6 +124,28 @@ export default function DashboardShell({ children }: DashboardShellProps) {
             if (list) {
               setNotifications(list);
               setUnreadNotifications(list.filter((n: any) => !n.read).length);
+              
+              if (prevNotifsCountRef.current > 0 && list.length > prevNotifsCountRef.current) {
+                const newCount = list.length - prevNotifsCountRef.current;
+                for (let i = 0; i < newCount; i++) {
+                  const newNotif = list[i];
+                  if (newNotif && !newNotif.read) {
+                    toast.info(`New Alert: ${newNotif.title}`);
+                    triggerBrowserNotification(newNotif.title, newNotif.message);
+                  }
+                }
+              }
+              prevNotifsCountRef.current = list.length;
+            }
+
+            if (role === 'GUARD' || role === 'ADMIN') {
+              const { data: alerts } = await supabase
+                .from('emergency_alerts')
+                .select('*')
+                .eq('status', 'ACTIVE');
+              if (alerts) {
+                setActiveEmergencyAlerts(alerts);
+              }
             }
           } else {
             router.push('/login');
@@ -101,7 +162,6 @@ export default function DashboardShell({ children }: DashboardShellProps) {
   useEffect(() => {
     fetchUserAndNotifications();
 
-    // In mock mode, we poll every 4 seconds to simulate realtime
     let interval: any;
     if (!hasSupabaseCreds()) {
       interval = setInterval(() => {
@@ -142,6 +202,34 @@ export default function DashboardShell({ children }: DashboardShellProps) {
       }
     }
   }, [user]);
+
+  const handleMarkRead = async (id: string) => {
+    if (!user) return;
+    try {
+      if (!hasSupabaseCreds()) {
+        const list = mockDb.getNotifications();
+        const idx = list.findIndex((n: any) => n.id === id);
+        if (idx !== -1) {
+          list[idx].read = true;
+          localStorage.setItem('mock_notifications', JSON.stringify(list));
+          toast.success('Notification marked as read');
+          fetchUserAndNotifications();
+        }
+      } else {
+        const supabase = createClient();
+        if (supabase) {
+          await supabase
+            .from('notifications')
+            .update({ read: true })
+            .eq('id', id);
+          toast.success('Notification marked as read');
+          fetchUserAndNotifications();
+        }
+      }
+    } catch (e) {
+      toast.error('Failed to update notification');
+    }
+  };
 
   const handleMarkAllRead = async () => {
     if (!user) return;
@@ -240,14 +328,16 @@ export default function DashboardShell({ children }: DashboardShellProps) {
           <span className="font-bold tracking-tight">GateKeeper VMS</span>
         </div>
         <div className="flex items-center gap-2">
-          {user?.role === 'RESIDENT' && (
+          {user && (
             <button 
               onClick={() => setNotifOpen(true)}
               className="relative p-1.5 text-slate-400 hover:text-slate-100"
             >
               <Bell className="w-5 h-5" />
               {unreadNotifications > 0 && (
-                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+                <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-rose-500 flex items-center justify-center text-[8px] font-bold text-white px-1">
+                  {unreadNotifications}
+                </span>
               )}
             </button>
           )}
@@ -283,15 +373,17 @@ export default function DashboardShell({ children }: DashboardShellProps) {
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-550">
                 Navigation
               </span>
-              {user?.role === 'RESIDENT' && (
+              {user && (
                 <button
                   type="button"
                   onClick={() => setNotifOpen(true)}
                   className="relative text-slate-500 hover:text-slate-200 transition-colors p-1"
                 >
-                  <Bell className="w-3.5 h-3.5" />
+                  <Bell className="w-4 h-4" />
                   {unreadNotifications > 0 && (
-                    <span className="absolute top-0 right-0 w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                    <span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] rounded-full bg-rose-500 flex items-center justify-center text-[8px] font-bold text-white px-0.5 animate-pulse">
+                      {unreadNotifications}
+                    </span>
                   )}
                 </button>
               )}
@@ -349,6 +441,56 @@ export default function DashboardShell({ children }: DashboardShellProps) {
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col min-w-0 relative">
+        {/* Active Emergency Banner */}
+        {activeEmergencyAlerts.length > 0 && (
+          <div className="bg-rose-950/90 border-b border-rose-500/30 text-rose-200 px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4 animate-pulse z-20">
+            <div className="flex items-center gap-3">
+              <span className="flex h-3.5 w-3.5 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-rose-500"></span>
+              </span>
+              <div className="flex flex-col">
+                <span className="font-extrabold text-sm text-rose-100 tracking-wider">🚨 ACTIVE EMERGENCY DETECTED</span>
+                <span className="text-xs text-rose-300">
+                  {activeEmergencyAlerts.length} active alert(s) requiring immediate attention.
+                </span>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => setNotifOpen(true)}
+                className="bg-rose-500 hover:bg-rose-600 text-slate-950 font-bold text-xs py-1.5 px-3 rounded-lg cursor-pointer"
+              >
+                View
+              </Button>
+              {user.role === 'GUARD' && (
+                <Button 
+                  onClick={async () => {
+                    const firstAlert = activeEmergencyAlerts[0];
+                    if (!hasSupabaseCreds()) {
+                      mockDb.resolveEmergencyAlert(firstAlert.id, user.id);
+                      fetchUserAndNotifications();
+                      toast.success('Emergency resolved successfully.');
+                    } else {
+                      const supabase = createClient();
+                      if (supabase) {
+                        await supabase
+                          .from('emergency_alerts')
+                          .update({ status: 'RESOLVED', resolved_by: user.id, resolved_at: new Date().toISOString() })
+                          .eq('id', firstAlert.id);
+                        fetchUserAndNotifications();
+                        toast.success('Emergency resolved successfully.');
+                      }
+                    }
+                  }}
+                  className="bg-slate-950 hover:bg-slate-900 text-rose-400 border border-rose-500/20 font-bold text-xs py-1.5 px-3 rounded-lg cursor-pointer"
+                >
+                  Resolve First
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
         {/* Top Header background decoration */}
         <div className="absolute top-0 right-0 w-[50%] h-[20%] rounded-full bg-indigo-500/5 blur-[100px] pointer-events-none" />
         <div className="flex-1 p-6 md:p-8 overflow-y-auto">
@@ -381,15 +523,25 @@ export default function DashboardShell({ children }: DashboardShellProps) {
                   className={`
                     p-3.5 rounded-2xl border text-xs space-y-1.5 transition-all
                     ${n.read 
-                      ? 'bg-slate-950/20 border-slate-905 text-slate-500' 
+                      ? 'bg-slate-950/20 border-slate-800/60 text-slate-500' 
                       : 'bg-emerald-500/5 border-emerald-500/20 text-slate-200'}
                   `}
                 >
                   <div className="flex justify-between font-bold">
                     <span>{n.title}</span>
-                    <span className="text-[10px] text-slate-500 font-mono">
-                      {new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-slate-500 font-mono">
+                        {new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      {!n.read && (
+                        <button 
+                          onClick={() => handleMarkRead(n.id)}
+                          className="text-[10px] text-emerald-400 hover:text-emerald-300 font-bold ml-1.5 cursor-pointer"
+                        >
+                          Mark Read
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <p className="text-[11px] leading-relaxed text-slate-400">{n.message}</p>
                 </div>
