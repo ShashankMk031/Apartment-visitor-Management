@@ -93,3 +93,130 @@ This scenario validates the reporting and auditing capability.
 6. **Roster Management**:
    * Click **"Residents"** or **"Guards"** in the sidebar.
    * Add a new resident or guard, then verify they appear in the management lists.
+
+---
+
+## Test Scenario 3: Frequent Visitors / Trusted Entry
+
+This scenario tests the resident self-registration of staff and automatic check-in.
+
+1. Log in as **Resident 1** (`resident1@example.com`).
+2. Navigate to the **"Frequent Visitors"** tab on the Resident dashboard.
+3. Click **"Add Frequent Visitor"** and enter:
+   * **Full Name**: `Raju Milkman`
+   * **Phone**: `+919988770011`
+   * **Category**: Choose `Cook` or `Maid`
+   * **Notes**: `Comes daily at 7 AM`
+4. Click **Add Visitor**.
+5. **Verify**: The new staff card is displayed showing name, category, status, and a **"View QR Pass"** button.
+6. Click **"View QR Pass"**:
+   * **Verify**: A QR pass dialog appears with a permanent code e.g. `FREQ-MILK-...`.
+7. Log out and log in as **Guard 1** (`guard1@example.com`).
+8. On the Guard Console, locate **"Verify Visitor Code"** on the left.
+9. Type the QR Passcode `FREQ-MILK-101-9988` (or your newly generated frequent QR passcode) and click **"Verify Pass"**.
+10. **Verify**: The system automatically approves and checks in the visitor *without* sending a request to the resident.
+11. **Verify**: The visitor appears in the **"Inside Building"** list on the Guard Console.
+
+---
+
+## Test Scenario 4: Browser Notifications & Dropdown Navbar Inbox
+
+This scenario validates desktop alerts and the centralized notification dropdown.
+
+1. Log in as **Resident 1** (`resident1@example.com`).
+2. **Verify Browser Notification prompt**:
+   * The page should request permission to show notifications. Click **Allow**.
+3. Keep the Resident dashboard open.
+4. Open a private tab, go to the public gate check-in page `http://localhost:3000/public/visitor/apt-1`.
+5. Submit a request to Flat **101** (Amit Sharma) for visitor `David Swiggy`.
+6. Switch back to the Resident dashboard:
+   * **Verify**: A native OS/browser push notification pops up saying *"Visitor Waiting: David Swiggy is waiting at Flat 101."*
+   * **Verify**: The bell icon in the top right navbar shows an updated red badge count.
+7. Click the **Bell Icon** dropdown:
+   * **Verify**: The notification is listed. Click **"Mark as read"** or **"Mark all as read"** and verify the red badge clears.
+
+---
+
+## Test Scenario 5: Camera QR Scanner on Guard Console
+
+This scenario tests the browser-based WebRTC camera scanner frame.
+
+1. Log in as **Guard 1** (`guard1@example.com`).
+2. On the Guard dashboard, locate the **"Verify Visitor Code"** section and click the **"Scan QR Code"** button (looks like a camera icon).
+3. **Verify**:
+   * A scanner dialog overlay opens.
+   * If a camera is present, it prompts for camera access. Click **Allow**.
+   * Controls are available to "Start Camera", "Stop Camera", "Switch Camera", and a textbox fallback is provided.
+4. For rapid mock verification without a real physical printed QR code, click **"Simulate Scan: Valid Pass"** or **"Simulate Scan: Frequent Visitor"** inside the dialog.
+5. **Verify**: The scanner automatically captures the code, closes the camera stream, decodes the details, and loads the visitor card for check-in.
+
+---
+
+## Test Scenario 6: Visitor History Search
+
+This scenario tests the historical search query engine.
+
+1. Log in as **Guard 1** (`guard1@example.com`) or **Admin** (`admin@example.com`).
+2. Navigate to the **"History Search"** tab.
+3. Try searching with various query combinations:
+   * Search by **Phone**: Enter `+919123456001`.
+   * Search by **Name**: Enter `Ramesh`.
+   * Search by **Flat**: Enter `101`.
+   * Filter by **Date Range**: Select yesterday and today.
+4. **Verify**:
+   * Search results populate instantly.
+   * Clicking a search item loads the visitor history detail modal showing: **Total Visits**, **First Visit**, and **Last Visit** timestamps.
+
+---
+
+## Test Scenario 7: Visitor Blacklist & Blocked Entry
+
+This scenario tests the admin blacklist controls and entry validation.
+
+1. Log in as **Admin** (`admin@example.com`).
+2. Navigate to the **"Blacklist Management"** tab.
+3. Click **"Add Blacklisted Visitor"** and enter:
+   * **Name**: `Scammer Joe`
+   * **Phone**: `+919000000000`
+   * **Reason**: `Spamming residents with advertisements.`
+4. Click **Blacklist Visitor**.
+5. Log out and go to the public check-in gate portal `http://localhost:3000/public/visitor/apt-1`.
+6. Try to submit a visitor request to any flat with phone number `+919000000000`.
+7. **Verify**:
+   * The request is automatically rejected.
+   * A red warning modal appears saying: *"Access Denied: Visitor has been blacklisted. The security desk has been notified."*
+8. Log in as **Admin** (`admin@example.com`), go to **"Audit Logs"**:
+   * **Verify**: There is a system log: *"Blocked entry attempt by blacklisted visitor: Scammer Joe (+919000000000)..."*
+
+---
+
+## Test Scenario 8: Emergency Alert System
+
+This scenario tests the resident panic button and guard resolution.
+
+1. Log in as **Resident 1** (`resident1@example.com`).
+2. Locate the red **"Trigger Emergency"** floating button (FAB) in the bottom right corner.
+3. Click the button. A modal pops up.
+4. Select **"Fire"** or **"Security Threat"** and click **"Trigger Alert Now"**.
+5. Log out and log in as **Guard 1** (`guard1@example.com`).
+6. **Verify**:
+   * A prominent, red flashing emergency banner appears at the top of the screen: *"🚨 ACTIVE EMERGENCY: FIRE at Flat 101 (Amit Sharma). Action required!"*
+7. Click the **"Resolve"** button on the banner or under the emergency alerts log.
+8. Click **"Acknowledge & Resolve"** in the confirmation modal.
+9. **Verify**: The flashing banner disappears, and the audit log records the resolution event.
+
+---
+
+## Test Scenario 9: Demo Enhancements
+
+This scenario tests the sandboxed mock databases and visual states.
+
+1. Log in as **Admin** (`admin@example.com`).
+2. Navigate to the **"Demo Mode"** section.
+3. **Verify Demo Stats Card**:
+   * Displays count of registered Apartments, Residents, Guards, and total Visitors in system database.
+4. Click **"Inject Mock Entry"** or **"Trigger Blacklist entry demo"** buttons to run custom simulation events.
+5. Click **"Reset Mock Database"** to restore all initial clean datasets.
+6. Refresh the page:
+   * **Verify**: Dashboard graphs show loading skeleton blocks during simulated queries, providing high visual polish.
+

@@ -88,3 +88,38 @@ Below is the layout of the 5 floors, showing the exact flat number, resident nam
 | **503** | Hardik Pandya | `resident23@example.com` | `+919876543222` |
 | **504** | Jasprit Bumrah | `resident24@example.com` | `+919876543223` |
 | **505** | Rohit Sharma | `resident25@example.com` | `+919876543224` |
+
+---
+
+## 4. Pre-seeded Frequent Visitors (Trusted QR Codes)
+These are recurring help/staff members pre-registered under specific residents:
+
+*   **Raju Milkman** (Category: `COOK`, Host Flat: **101**):
+    *   **Phone**: `+919988770011`
+    *   **QR Passcode**: `FREQ-MILK-101-9988`
+    *   **Status**: Active (Auto check-in allowed)
+*   **Shanti Maid** (Category: `MAID`, Host Flat: **101**):
+    *   **Phone**: `+919988770022`
+    *   **QR Passcode**: `FREQ-MAID-101-7766`
+    *   **Status**: Active (Auto check-in allowed)
+*   **Ramesh Driver** (Category: `DRIVER`, Host Flat: **102**):
+    *   **Phone**: `+919988770033`
+    *   **QR Passcode**: `FREQ-DRIV-102-5544`
+    *   **Status**: Active (Auto check-in allowed)
+*   **Lata Cook** (Category: `COOK`, Host Flat: **201**):
+    *   **Phone**: `+919988770044`
+    *   **QR Passcode**: `FREQ-COOK-201-1122`
+    *   **Status**: Inactive (Scan will reject as deactivated)
+
+---
+
+## 5. Blacklisted Visitors (Banned Entry Contacts)
+These phone numbers are barred from checking in. Attempting to enter with these credentials triggers automatic gate rejection:
+
+*   **Scammer Joe**:
+    *   **Phone**: `+919000000000`
+    *   **Reason**: Suspicious marketing activities inside the building
+*   **Rude Delivery Rider**:
+    *   **Phone**: `+919111111111`
+    *   **Reason**: Altercation with guards at the main gate
+

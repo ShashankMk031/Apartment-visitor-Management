@@ -11,6 +11,7 @@ import { Shield, Home, UserCheck, AlertCircle, Search, CalendarDays } from 'luci
 import { mockDb, hasSupabaseCreds, Resident, Apartment } from '@/lib/supabase/mockDb';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 
 export default function VisitorPortalPage() {
   const router = useRouter();
@@ -22,6 +23,7 @@ export default function VisitorPortalPage() {
   const [filteredResidents, setFilteredResidents] = useState<Resident[]>([]);
   const [selectedResident, setSelectedResident] = useState<Resident | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [blacklistWarning, setBlacklistWarning] = useState<{ name: string; reason: string } | null>(null);
   
   // Form fields
   const [visitorName, setVisitorName] = useState('');
@@ -121,6 +123,49 @@ export default function VisitorPortalPage() {
     try {
       const numVisitors = parseInt(numberOfVisitors, 10) || 1;
       const duration = parseInt(expectedDuration, 10) || 60;
+
+      // Check Blacklist
+      if (isMock) {
+        const blacklisted = mockDb.checkBlacklist(visitorPhone);
+        if (blacklisted) {
+          mockDb.createAuditLog({
+            actor_id: 'system',
+            actor_name: 'System',
+            action_type: 'ADMIN_ACTION',
+            description: `Blocked entry attempt by blacklisted visitor: ${visitorName} (${visitorPhone}). Reason: ${blacklisted.reason}`,
+          });
+          setBlacklistWarning({
+            name: visitorName,
+            reason: blacklisted.reason,
+          });
+          setLoading(false);
+          return;
+        }
+      } else {
+        const supabase = createClient();
+        if (supabase) {
+          const { data: blacklisted } = await supabase
+            .from('blacklisted_visitors')
+            .select('*')
+            .eq('phone', visitorPhone)
+            .maybeSingle();
+
+          if (blacklisted) {
+            await supabase.from('audit_logs').insert({
+              actor_id: null,
+              actor_name: 'System Gatekeeper',
+              action_type: 'ADMIN_ACTION',
+              description: `Blocked entry attempt by blacklisted visitor: ${visitorName} (${visitorPhone}). Reason: ${blacklisted.reason}`,
+            });
+            setBlacklistWarning({
+              name: visitorName,
+              reason: blacklisted.reason,
+            });
+            setLoading(false);
+            return;
+          }
+        }
+      }
 
       if (isMock) {
         // Create in Mock DB
@@ -390,6 +435,33 @@ export default function VisitorPortalPage() {
           </Card>
         </div>
       </main>
+
+      {/* Blacklist Warning Dialog */}
+      <Dialog open={!!blacklistWarning} onOpenChange={(open) => !open && setBlacklistWarning(null)}>
+        <DialogContent className="bg-slate-900 border-red-500/50 text-slate-100 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-400 text-lg">
+              <AlertCircle className="w-5 h-5" />
+              Access Denied (Blacklisted Visitor)
+            </DialogTitle>
+            <DialogDescription className="text-slate-400 pt-2 text-sm">
+              The visitor <strong>{blacklistWarning?.name}</strong> is currently on the apartment blacklist. Entry is blocked, and the security desk has been notified.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="bg-slate-950 p-4 rounded-lg border border-slate-800 my-2 text-xs">
+            <span className="text-slate-500 block mb-1">Reason:</span>
+            <p className="text-slate-300 font-medium italic">{blacklistWarning?.reason}</p>
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={() => setBlacklistWarning(null)}
+              className="w-full bg-red-600 hover:bg-red-700 text-white font-bold"
+            >
+              Acknowledge
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Footer */}
       <footer className="max-w-4xl mx-auto w-full text-center text-[10px] text-slate-600 pt-6 border-t border-slate-900">
