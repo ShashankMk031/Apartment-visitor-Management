@@ -70,8 +70,27 @@ export default function VisitorPortalPage() {
               phone: r.phone,
               created_at: '',
             }));
-            setResidents(mapped);
-            setFilteredResidents(mapped);
+
+            // Deduplicate by flat_number: prefer registered residents (non-seeded UUID)
+            const dedupedMap: { [flat: string]: Resident } = {};
+            mapped.forEach(resident => {
+              const flat = resident.flat_number;
+              const existing = dedupedMap[flat];
+              
+              if (!existing) {
+                dedupedMap[flat] = resident;
+              } else {
+                const isExistingSeeded = existing.id.startsWith('e0000000-');
+                const isNewSeeded = resident.id.startsWith('e0000000-');
+                if (isExistingSeeded && !isNewSeeded) {
+                  dedupedMap[flat] = resident;
+                }
+              }
+            });
+
+            const dedupedList = Object.values(dedupedMap);
+            setResidents(dedupedList);
+            setFilteredResidents(dedupedList);
           }
         }
       };

@@ -96,16 +96,38 @@ export default function ResidentDashboard() {
               user_metadata: { full_name: supabaseUser.user_metadata?.full_name }
             });
 
-            // Fetch requests
-            const { data: reqs } = await supabase
-              .from('visitor_requests')
-              .select('*')
-              .eq('resident_id', supabaseUser.id)
-              .order('created_at', { ascending: false });
+            // Fetch requests by flat number to resolve seeded/registered resident ID conflicts
+            let flatNo = supabaseUser.user_metadata?.flat_number;
+
+            if (!flatNo) {
+              const { data: resData } = await supabase
+                .from('residents')
+                .select('flat_number')
+                .eq('id', supabaseUser.id)
+                .maybeSingle();
+              if (resData) {
+                flatNo = resData.flat_number;
+              }
+            }
+
+            let reqQuery = supabase.from('visitor_requests').select(`
+              *,
+              residents!inner (
+                flat_number
+              )
+            `);
+
+            if (flatNo) {
+              reqQuery = reqQuery.eq('residents.flat_number', flatNo);
+            } else {
+              reqQuery = reqQuery.eq('resident_id', supabaseUser.id);
+            }
+
+            const { data: reqs } = await reqQuery.order('created_at', { ascending: false });
 
             if (reqs) {
-              setRequests(reqs);
-              calculateStats(reqs);
+              setRequests(reqs as any);
+              calculateStats(reqs as any);
             }
 
             // Fetch frequent visitors
