@@ -18,7 +18,8 @@ import {
   User, 
   UserCheck2,
   Calendar,
-  LogOut
+  LogOut,
+  Link2
 } from 'lucide-react';
 import { mockDb, hasSupabaseCreds, VisitorRequest, VisitorEntry } from '@/lib/supabase/mockDb';
 import { createClient } from '@/lib/supabase/client';
@@ -407,6 +408,19 @@ export default function VisitorTrackingPage() {
                 >
                   <Download className="w-4 h-4" />
                   <span>Download Pass (PNG)</span>
+                </Button>
+
+                <Button 
+                  onClick={() => {
+                    if (typeof window !== 'undefined') {
+                      navigator.clipboard.writeText(`${window.location.origin}/public/tracking/${request.id}`);
+                      toast.success('Pass link copied to clipboard!');
+                    }
+                  }}
+                  className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 gap-2 rounded-xl text-xs py-5 transition-colors font-bold mt-2"
+                >
+                  <Link2 className="w-4 h-4" />
+                  <span>Copy Pass Link</span>
                 </Button>
               </Card>
 

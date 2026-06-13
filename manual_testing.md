@@ -220,3 +220,30 @@ This scenario tests the sandboxed mock databases and visual states.
 6. Refresh the page:
    * **Verify**: Dashboard graphs show loading skeleton blocks during simulated queries, providing high visual polish.
 
+---
+
+## Test Scenario 10: Visitor Pass Recovery & Lookup
+
+This scenario verifies that a visitor can retrieve their QR code pass and badge using their phone number or Request ID, and copy their pass link.
+
+1. Log in as **Resident 1** (`resident1@example.com`).
+2. Keep the resident window open. In an incognito window, open the public visitor check-in form (`http://localhost:3000/public/visitor/apt-1`).
+3. Select **Amit Sharma (Flat 101)** and submit a request for visitor `John Recovery` with phone number `+919999000011`.
+4. Switch back to the resident tab: approve the request for `John Recovery`.
+5. Return to the visitor tracking page:
+   * **Verify**: The request is approved.
+   * **Verify**: A green **"Copy Pass Link"** button is displayed next to the "Download Pass" option.
+6. Click **Copy Pass Link**. Verify a toast notification confirms it is copied. Paste it into your browser address bar and verify it successfully loads the tracker.
+7. Close the visitor tracker tab (simulating losing the page).
+8. Go to the Pass Lookup page: `http://localhost:3000/public/pass-lookup`.
+9. Test lookup by **Request ID**:
+   * Copy the Request ID (e.g. `req-xxxx`) from the URL or logs.
+   * Enter the ID in the input box and click **Retrieve Pass**.
+   * **Verify**: The tracker timeline, QR Pass, and Guest Badge are successfully resolved and displayed.
+10. Test lookup by **Phone Number**:
+    * Click **Lookup Another Pass** to return to search.
+    * Enter phone number `+919999000011` and click **Retrieve Pass**.
+    * **Verify**: Since there might be only one request for this phone, it resolves directly to the pass detail.
+    * Try entering a phone number with multiple entries (e.g., from seed data or by submitting multiple requests with the same phone).
+    * **Verify**: The system presents a clean selectable list of all past requests. Selecting one successfully loads the access pass and visitor badge.
+
