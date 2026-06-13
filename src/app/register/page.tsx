@@ -30,7 +30,7 @@ export default function RegisterPage() {
     if (credsExist) {
       const supabase = createClient();
       if (supabase) {
-        supabase.from('apartments').select('id').limit(1).maybeSingle().then(({ data }) => {
+        supabase.from('apartments').select('id').limit(1).maybeSingle().then(({ data }: { data: any }) => {
           if (data?.id) {
             setApartmentId(data.id);
           }
