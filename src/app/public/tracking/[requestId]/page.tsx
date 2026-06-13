@@ -1,100 +1,86 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { 
-  Shield, 
-  Clock, 
-  CheckCircle2, 
-  XCircle, 
-  QrCode, 
-  Download, 
-  RefreshCw, 
-  Phone, 
-  MapPin, 
-  User, 
-  UserCheck2,
-  Calendar,
-  LogOut,
-  Link2
-} from 'lucide-react';
 import { mockDb, hasSupabaseCreds, VisitorRequest, VisitorEntry } from '@/lib/supabase/mockDb';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import QRCode from 'qrcode';
 
+/* ── status helpers ──────────────────────────────────────── */
+type Status = VisitorRequest['status'];
+
+function statusStep(status: Status, hasEntry: boolean, hasExit: boolean): number {
+  if (hasExit)            return 4;
+  if (hasEntry)           return 3;
+  if (status === 'APPROVED') return 2;
+  if (status === 'REJECTED') return -1;
+  return 1; // PENDING
+}
+
+const STEPS = [
+  { label: 'Submitted',   sub: 'Request received' },
+  { label: 'Approved',    sub: 'Resident confirmed' },
+  { label: 'Checked in',  sub: 'Entered premises'  },
+  { label: 'Completed',   sub: 'Visit concluded'   },
+];
+
 export default function VisitorTrackingPage() {
-  const params = useParams();
-  const router = useRouter();
+  const params    = useParams();
+  const router    = useRouter();
   const requestId = params?.requestId as string;
 
-  const [request, setRequest] = useState<VisitorRequest | null>(null);
-  const [entry, setEntry] = useState<VisitorEntry | null>(null);
+  const [request, setRequest]           = useState<VisitorRequest | null>(null);
+  const [entry, setEntry]               = useState<VisitorEntry | null>(null);
   const [residentName, setResidentName] = useState('');
-  const [flatNumber, setFlatNumber] = useState('');
-  const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [isMock, setIsMock] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [flatNumber, setFlatNumber]     = useState('');
+  const [qrDataUrl, setQrDataUrl]       = useState('');
+  const [loading, setLoading]           = useState(true);
+  const [refreshing, setRefreshing]     = useState(false);
+  const [pulse, setPulse]               = useState(false);       // flash on auto-refresh
+  const prevStatus                      = useRef<string>('');
 
-  const fetchStatus = async (showRefState = false) => {
-    if (showRefState) setRefreshing(true);
+  /* ── fetch ────────────────────────────────────────────── */
+  const fetchStatus = async (showSpin = false) => {
+    if (showSpin) setRefreshing(true);
     try {
       if (!hasSupabaseCreds()) {
-        const reqs = mockDb.getVisitorRequests();
-        const req = reqs.find(r => r.id === requestId);
-        
+        const req = mockDb.getVisitorRequests().find(r => r.id === requestId);
         if (req) {
-          setRequest(req);
-          // Find resident info
-          const res = mockDb.getResidents().find(r => r.id === req.resident_id);
-          if (res) {
-            setResidentName(res.full_name);
-            setFlatNumber(res.flat_number);
+          if (prevStatus.current && prevStatus.current !== req.status) {
+            setPulse(true); setTimeout(() => setPulse(false), 800);
           }
-          // Find entry info
-          const entries = mockDb.getVisitorEntries();
-          const ent = entries.find(e => e.visitor_request_id === req.id);
+          prevStatus.current = req.status;
+          setRequest(req);
+          const res = mockDb.getResidents().find(r => r.id === req.resident_id);
+          if (res) { setResidentName(res.full_name); setFlatNumber(res.flat_number); }
+          const ent = mockDb.getVisitorEntries().find(e => e.visitor_request_id === req.id);
           if (ent) setEntry(ent);
         }
       } else {
         const supabase = createClient();
         if (supabase) {
-          const { data: req, error } = await supabase
+          const { data: req } = await supabase
             .from('visitor_requests')
-            .select(`
-              *,
-              residents (
-                flat_number,
-                profiles (
-                  full_name
-                )
-              )
-            `)
-            .eq('id', requestId)
-            .single();
-
+            .select('*, residents(flat_number, profiles(full_name))')
+            .eq('id', requestId).single();
           if (req) {
+            if (prevStatus.current && prevStatus.current !== req.status) {
+              setPulse(true); setTimeout(() => setPulse(false), 800);
+            }
+            prevStatus.current = req.status;
             setRequest(req);
             setResidentName(req.residents?.profiles?.full_name || 'Resident');
-            setFlatNumber(req.residents?.flat_number || 'TBD');
-
-            // Fetch entry
+            setFlatNumber(req.residents?.flat_number || '—');
             const { data: ent } = await supabase
-              .from('visitor_entries')
-              .select('*')
-              .eq('visitor_request_id', req.id)
-              .maybeSingle();
-            
+              .from('visitor_entries').select('*')
+              .eq('visitor_request_id', req.id).maybeSingle();
             if (ent) setEntry(ent);
           }
         }
       }
     } catch (err) {
-      console.error('Error fetching tracking status:', err);
+      console.error(err);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -102,60 +88,46 @@ export default function VisitorTrackingPage() {
   };
 
   useEffect(() => {
-    setIsMock(!hasSupabaseCreds());
     fetchStatus();
-
-    // Auto refresh every 3 seconds
-    const interval = setInterval(() => {
-      fetchStatus();
-    }, 3000);
-
-    return () => clearInterval(interval);
+    const t = setInterval(() => fetchStatus(), 3000);
+    return () => clearInterval(t);
   }, [requestId]);
 
-  // Generate QR Code when approved
+  /* ── QR generation ────────────────────────────────────── */
   useEffect(() => {
-    if (request && request.status === 'APPROVED') {
-      // Encode the request ID in the QR code so the guard can scan it!
+    if (request?.status === 'APPROVED') {
       QRCode.toDataURL(request.id, {
-        width: 200,
-        margin: 1,
-        color: {
-          dark: '#020617', // slate-950
-          light: '#ffffff',
-        }
-      })
-        .then(url => setQrCodeDataUrl(url))
-        .catch(err => console.error('QR code generation error:', err));
+        width: 220, margin: 2,
+        color: { dark: '#1E1D1B', light: '#ffffff' },
+      }).then(setQrDataUrl).catch(console.error);
     }
   }, [request]);
 
-  const handleDownloadQR = () => {
-    if (!qrCodeDataUrl) return;
+  const downloadQR = () => {
+    if (!qrDataUrl) return;
     const a = document.createElement('a');
-    a.href = qrCodeDataUrl;
-    a.download = `visitor-pass-${request?.visitor_name.replace(/\s+/g, '-')}.png`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    toast.success('QR Pass downloaded successfully');
+    a.href = qrDataUrl;
+    a.download = `gate-pass-${request?.visitor_name.replace(/\s+/g, '-')}.png`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    toast.success('Gate pass downloaded');
   };
 
-  const getStatusColor = (status: VisitorRequest['status']) => {
-    switch (status) {
-      case 'PENDING': return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
-      case 'APPROVED': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
-      case 'REJECTED': return 'bg-rose-500/10 text-rose-400 border-rose-500/20';
-      case 'EXPIRED': return 'bg-slate-500/10 text-slate-400 border-slate-500/20';
-    }
-  };
+  /* ── derived ──────────────────────────────────────────── */
+  const hasEntry    = !!entry;
+  const hasExit     = !!entry?.exit_time;
+  const step        = request ? statusStep(request.status, hasEntry, hasExit) : 0;
+  const isRejected  = request?.status === 'REJECTED';
+  const isApproved  = request?.status === 'APPROVED';
+  const isPending   = request?.status === 'PENDING';
 
+  /* ── loading / error ──────────────────────────────────── */
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="space-y-4 text-center">
-          <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-slate-400 text-sm animate-pulse">Loading Tracker...</p>
+      <div style={{ minHeight: '100vh', background: '#F4F2EE', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ width: 36, height: 36, borderRadius: '50%', border: '3px solid #E4E0D8', borderTopColor: '#5B8E85', animation: 'spin 0.8s linear infinite', margin: '0 auto 14px' }} />
+          <p style={{ fontSize: 13, color: '#7A7670' }}>Loading your pass…</p>
         </div>
       </div>
     );
@@ -163,308 +135,623 @@ export default function VisitorTrackingPage() {
 
   if (!request) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col justify-center items-center p-4">
-        <XCircle className="w-12 h-12 text-rose-500 mb-4 animate-bounce" />
-        <h2 className="text-xl font-bold text-slate-200 mb-2">Request Not Found</h2>
-        <p className="text-slate-500 text-sm mb-6 text-center max-w-sm">The tracking ID is invalid or has expired.</p>
-        <Button onClick={() => router.push('/')} className="bg-emerald-500 hover:bg-emerald-600 text-slate-950">
-          Go back home
-        </Button>
+      <div style={{ minHeight: '100vh', background: '#F4F2EE', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+        <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#FCEAEA', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#C0392B' }}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+        </div>
+        <h2 style={{ fontSize: 17, fontWeight: 700, color: '#1E1D1B' }}>Request not found</h2>
+        <p style={{ fontSize: 13, color: '#7A7670', maxWidth: 280, textAlign: 'center', lineHeight: 1.6 }}>This tracking ID is invalid or may have expired.</p>
+        <button onClick={() => router.push('/')} style={{ marginTop: 8, padding: '10px 22px', borderRadius: 12, background: '#5B8E85', color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+          Return home
+        </button>
       </div>
     );
   }
 
+  /* ──────────────────────────────────────────────────────── */
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between p-4 md:p-8 relative overflow-hidden">
-      <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-emerald-500/5 blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-500/5 blur-[120px] pointer-events-none" />
+    <>
+      <style>{`
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+          --bg:         #F4F2EE;
+          --surface:    #FAFAF8;
+          --border:     #E4E0D8;
+          --border-md:  #D5D0C7;
+          --sage:       #5B8E85;
+          --sage-light: #EBF4F2;
+          --sage-mid:   #A8CFC9;
+          --text:       #1E1D1B;
+          --muted:      #7A7670;
+          --amber:      #B07A3E;
+          --amber-bg:   #FBF3E8;
+          --amber-mid:  #E8C78A;
+          --red:        #C0392B;
+          --red-bg:     #FCEAEA;
+          --neu-bg:     #EDEAE4;
+          --neu-dark:   rgba(0,0,0,0.12);
+          --neu-light:  rgba(255,255,255,0.90);
+        }
+        body { background: var(--bg); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; color: var(--text); }
 
-      {/* Header */}
-      <header className="max-w-4xl mx-auto w-full flex justify-between items-center pb-6 border-b border-slate-900">
-        <div className="flex items-center gap-2">
-          <Shield className="w-6 h-6 text-emerald-400" />
-          <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-emerald-400 to-indigo-400 bg-clip-text text-transparent">
-            GateKeeper VMS
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => fetchStatus(true)}
-            className="text-slate-400 hover:text-slate-100 bg-slate-900/60 rounded-xl"
-            disabled={refreshing}
-          >
-            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => router.push('/')} 
-            className="border-slate-800 hover:bg-slate-900 text-slate-300 text-xs rounded-xl"
-          >
-            Exit Gate
-          </Button>
-        </div>
-      </header>
+        .wrap { min-height: 100vh; display: flex; flex-direction: column; }
 
-      {/* Main Grid */}
-      <main className="max-w-4xl mx-auto w-full grid grid-cols-1 md:grid-cols-12 gap-8 my-8 grow items-start">
-        
-        {/* Left Side: Status Info Card */}
-        <div className="md:col-span-7 space-y-6">
-          <Card className="border-slate-800 bg-slate-900/60 backdrop-blur-xl shadow-xl">
-            <CardHeader className="pb-4">
-              <div className="flex justify-between items-start">
-                <div className="space-y-1">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">
-                    Request ID: {request.id}
-                  </span>
-                  <CardTitle className="text-xl text-slate-100">
-                    Live Access Tracker
-                  </CardTitle>
-                </div>
-                <Badge className={`border uppercase text-[10px] font-bold px-2.5 py-1 ${getStatusColor(request.status)}`}>
-                  {request.status}
-                </Badge>
+        /* header */
+        .header {
+          background: var(--surface); border-bottom: 1px solid var(--border);
+          height: 62px; padding: 0 32px;
+          display: flex; align-items: center; justify-content: space-between;
+          position: sticky; top: 0; z-index: 50;
+        }
+        .logo { display: flex; align-items: center; gap: 10px; }
+        .logo-icon { width: 34px; height: 34px; border-radius: 10px; background: var(--sage-light); color: var(--sage); display: flex; align-items: center; justify-content: center; }
+        .logo-name { font-size: 15px; font-weight: 700; color: var(--text); }
+        .logo-name span { color: var(--sage); }
+        .header-actions { display: flex; gap: 8px; }
+        .btn-icon {
+          width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--border);
+          background: transparent; display: flex; align-items: center; justify-content: center;
+          color: var(--muted); cursor: pointer; transition: all 0.15s;
+        }
+        .btn-icon:hover { background: var(--bg); border-color: var(--border-md); color: var(--text); }
+        .btn-outline {
+          padding: 7px 16px; border-radius: 10px; border: 1px solid var(--border);
+          background: transparent; font-size: 12px; font-weight: 500; color: var(--muted);
+          cursor: pointer; transition: all 0.15s;
+        }
+        .btn-outline:hover { background: var(--bg); color: var(--text); border-color: var(--border-md); }
+
+        /* main */
+        .main {
+          flex: 1; max-width: 900px; margin: 0 auto; width: 100%;
+          padding: 32px 24px;
+          display: grid; grid-template-columns: 1fr 340px; gap: 24px; align-items: start;
+        }
+
+        /* card */
+        .card {
+          background: var(--surface); border: 1px solid var(--border);
+          border-radius: 22px; overflow: hidden;
+        }
+        .card-header { padding: 22px 24px 18px; border-bottom: 1px solid var(--border); }
+        .card-body   { padding: 22px 24px; }
+
+        /* request id pill */
+        .req-pill {
+          display: inline-flex; align-items: center; gap: 6px;
+          padding: 4px 10px; border-radius: 30px;
+          background: var(--bg); border: 1px solid var(--border);
+          font-size: 11px; color: var(--muted); font-family: ui-monospace, monospace;
+          margin-bottom: 10px;
+        }
+
+        /* status badge */
+        .status-badge {
+          display: inline-flex; align-items: center; gap: 5px;
+          padding: 5px 12px; border-radius: 30px;
+          font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;
+        }
+        .status-badge.pending  { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-mid); }
+        .status-badge.approved { background: var(--sage-light); color: var(--sage);  border: 1px solid var(--sage-mid); }
+        .status-badge.rejected { background: var(--red-bg);    color: var(--red);   border: 1px solid #F5B8B0; }
+        .status-badge.inside   { background: #EBF0F7;          color: #5B7FAB;      border: 1px solid #B0C4DE; }
+        .status-badge.done     { background: var(--border);    color: var(--muted); border: 1px solid var(--border-md); }
+
+        .status-dot {
+          width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+        }
+        .status-dot.pending  { background: var(--amber); animation: pulseDot 2s ease-in-out infinite; }
+        .status-dot.approved { background: var(--sage); animation: pulseDot 2s ease-in-out infinite; }
+        .status-dot.rejected { background: var(--red); }
+        .status-dot.idle     { background: var(--muted); }
+
+        @keyframes pulseDot {
+          0%,100% { opacity:1; transform:scale(1); }
+          50% { opacity:0.4; transform:scale(0.75); }
+        }
+
+        /* ── TIMELINE ──────────────────────────────────── */
+        .timeline { padding: 6px 0; }
+        .tl-row {
+          display: grid;
+          grid-template-columns: 32px 1fr;
+          gap: 0 14px;
+          position: relative;
+        }
+        /* connector line between rows */
+        .tl-row:not(:last-child) .tl-left::after {
+          content: '';
+          position: absolute;
+          left: 15px; top: 32px; bottom: -14px;
+          width: 2px;
+          background: var(--border);
+          border-radius: 2px;
+          transition: background 0.4s;
+          z-index: 0;
+        }
+        .tl-row.done .tl-left::after { background: var(--sage-mid); }
+        .tl-row.active .tl-left::after { background: var(--border); }
+
+        .tl-left { position: relative; display: flex; flex-direction: column; align-items: center; z-index: 1; }
+        .tl-node {
+          width: 32px; height: 32px; border-radius: 50%;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 13px; font-weight: 700; flex-shrink: 0;
+          border: 2px solid transparent;
+          transition: all 0.4s;
+          position: relative; z-index: 1;
+        }
+        .tl-node.done    { background: var(--sage); color: #fff; border-color: var(--sage); }
+        .tl-node.active  { background: var(--sage-light); color: var(--sage); border-color: var(--sage); }
+        .tl-node.waiting { background: var(--surface); color: var(--muted); border-color: var(--border); }
+        .tl-node.error   { background: var(--red-bg); color: var(--red); border-color: #F5B8B0; }
+        .tl-node.pulse   { animation: nodeGlow 1.5s ease-in-out infinite; }
+        @keyframes nodeGlow {
+          0%,100% { box-shadow: 0 0 0 0 rgba(91,142,133,0); }
+          50%     { box-shadow: 0 0 0 6px rgba(91,142,133,0.18); }
+        }
+
+        .tl-right { padding-bottom: 24px; }
+        .tl-step-label { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 2px; line-height: 1; }
+        .tl-step-label.muted { color: var(--muted); }
+        .tl-step-sub { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+        .tl-step-time { font-size: 11px; color: var(--sage); font-weight: 500; }
+
+        /* pulse on status change */
+        .status-flash { animation: flashBg 0.8s ease; }
+        @keyframes flashBg { 0%,100% { background: var(--surface); } 40% { background: var(--sage-light); } }
+
+        /* detail grid */
+        .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .detail-item {}
+        .detail-key { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; }
+        .detail-val { font-size: 13px; font-weight: 600; color: var(--text); }
+
+        /* divider */
+        .divider { height: 1px; background: var(--border); margin: 20px 0; }
+
+        /* security log */
+        .log-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .log-cell { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
+        .log-cell-key { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .log-cell-val { font-size: 13px; font-weight: 600; color: var(--text); }
+        .log-cell-val.inside { color: var(--sage); }
+
+        /* ── right panel ─────────────────────────────── */
+        .right-col { display: flex; flex-direction: column; gap: 16px; }
+
+        /* pending card */
+        .pending-card {
+          background: var(--amber-bg); border: 1px solid var(--amber-mid);
+          border-radius: 20px; padding: 28px 24px; text-align: center;
+        }
+        .pending-icon {
+          width: 52px; height: 52px; border-radius: 50%;
+          background: rgba(176,122,62,0.12); color: var(--amber);
+          display: flex; align-items: center; justify-content: center; margin: 0 auto 14px;
+        }
+        .pending-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+        .pending-desc  { font-size: 12px; color: var(--muted); line-height: 1.6; max-width: 220px; margin: 0 auto 14px; }
+        .refresh-pill {
+          display: inline-flex; align-items: center; gap: 6px;
+          background: rgba(176,122,62,0.1); border: 1px solid var(--amber-mid);
+          border-radius: 30px; padding: 6px 14px;
+          font-size: 11px; color: var(--amber); font-weight: 500;
+        }
+
+        /* rejected card */
+        .rejected-card {
+          background: var(--red-bg); border: 1px solid #F5B8B0;
+          border-radius: 20px; padding: 28px 24px; text-align: center;
+        }
+        .rejected-icon {
+          width: 52px; height: 52px; border-radius: 50%;
+          background: rgba(192,57,43,0.1); color: var(--red);
+          display: flex; align-items: center; justify-content: center; margin: 0 auto 14px;
+        }
+        .rejected-title { font-size: 14px; font-weight: 700; color: var(--red); margin-bottom: 6px; }
+        .rejected-desc  { font-size: 12px; color: var(--muted); line-height: 1.6; max-width: 220px; margin: 0 auto; }
+
+        /* qr pass card */
+        .qr-card {
+          background: var(--surface); border: 1px solid var(--border);
+          border-radius: 20px; overflow: hidden;
+        }
+        .qr-card-header {
+          background: var(--sage-light); border-bottom: 1px solid var(--sage-mid);
+          padding: 14px 20px; display: flex; align-items: center; gap: 8px;
+        }
+        .qr-card-title { font-size: 13px; font-weight: 700; color: var(--sage); }
+        .qr-card-body  { padding: 20px; text-align: center; }
+        .qr-wrap {
+          display: inline-block; background: #fff; border-radius: 14px;
+          border: 1px solid var(--border); padding: 14px; margin-bottom: 14px;
+        }
+        .qr-placeholder { width: 200px; height: 200px; background: var(--border); border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+        .qr-hint { font-size: 11px; color: var(--muted); margin-bottom: 14px; }
+        .pass-code {
+          display: flex; align-items: center; justify-content: center; gap: 8px;
+          background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+          padding: 10px 14px; margin-bottom: 12px; font-family: ui-monospace, monospace;
+          font-size: 13px; font-weight: 700; color: var(--text);
+        }
+        .copy-btn {
+          background: none; border: none; cursor: pointer; color: var(--sage);
+          padding: 2px; display: flex; align-items: center;
+        }
+
+        /* neumorphic download button */
+        .btn-neu {
+          width: 100%; padding: 13px 20px; border: none; cursor: pointer;
+          border-radius: 14px;
+          background: var(--neu-bg);
+          box-shadow: 4px 4px 10px var(--neu-dark), -4px -4px 10px var(--neu-light);
+          font-size: 13px; font-weight: 700; color: var(--sage);
+          display: flex; align-items: center; justify-content: center; gap: 8px;
+          transition: all 0.15s;
+        }
+        .btn-neu:hover { box-shadow: 6px 6px 14px var(--neu-dark), -6px -6px 14px var(--neu-light); }
+        .btn-neu:active { box-shadow: inset 3px 3px 7px var(--neu-dark), inset -3px -3px 7px var(--neu-light); }
+
+        /* visitor badge */
+        .badge-card {
+          background: var(--surface); border: 1px solid var(--border); border-radius: 20px; overflow: hidden;
+        }
+        .badge-header {
+          background: linear-gradient(135deg, #4A7A72 0%, #5B8E85 100%);
+          padding: 14px 18px; display: flex; align-items: center; gap: 8px;
+        }
+        .badge-header-text { font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.8); text-transform: uppercase; letter-spacing: 0.8px; }
+        .badge-body { padding: 16px 18px; }
+        .badge-name { font-size: 16px; font-weight: 800; color: var(--text); letter-spacing: -0.3px; margin-bottom: 2px; }
+        .badge-type { font-size: 10px; font-weight: 700; color: var(--sage); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+        .badge-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .badge-cell { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px; }
+        .badge-cell-key { font-size: 9px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 2px; }
+        .badge-cell-val { font-size: 12px; font-weight: 600; color: var(--text); }
+
+        /* live pulse dot */
+        .live-dot {
+          width: 7px; height: 7px; border-radius: 50%; background: var(--sage);
+          animation: pulseDot 2s ease-in-out infinite;
+        }
+        .live-row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+
+        /* footer */
+        .footer { border-top: 1px solid var(--border); padding: 16px 32px; text-align: center; font-size: 11px; color: var(--muted); }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        @media (max-width: 720px) {
+          .main { grid-template-columns: 1fr; padding: 20px 16px; }
+          .header { padding: 0 16px; }
+          .detail-grid { grid-template-columns: 1fr; }
+        }
+      `}</style>
+
+      <div className="wrap">
+
+        {/* ── Header ── */}
+        <header className="header">
+          <div className="logo">
+            <div className="logo-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2L4 6v6c0 5.25 3.5 10.15 8 11.35C16.5 22.15 20 17.25 20 12V6l-8-4z"/>
+                <path d="M9 12l2 2 4-4"/>
+              </svg>
+            </div>
+            <span className="logo-name">Gate<span>Keeper</span></span>
+          </div>
+          <div className="header-actions">
+            <button
+              className="btn-icon"
+              onClick={() => fetchStatus(true)}
+              title="Refresh"
+              disabled={refreshing}
+            >
+              <svg
+                width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                style={{ animation: refreshing ? 'spin 0.8s linear infinite' : 'none' }}
+              >
+                <path d="M23 4v6h-6M1 20v-6h6"/>
+                <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+              </svg>
+            </button>
+            <button className="btn-outline" onClick={() => router.push('/')}>Exit gate</button>
+          </div>
+        </header>
+
+        {/* ── Main ── */}
+        <main className="main">
+
+          {/* ── Left: Status card ── */}
+          <div style={{ transition: 'background 0.4s' }} className={`card ${pulse ? 'status-flash' : ''}`}>
+            <div className="card-header">
+              <div className="req-pill">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+                {request.id}
               </div>
-            </CardHeader>
-            
-            <CardContent className="space-y-6">
-              {/* Tracker status visual */}
-              <div className="flex flex-col gap-4">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  Approval Timeline
-                </span>
-                
-                <div className="grid grid-cols-4 gap-2 text-center relative pt-2">
-                  {/* Progress lines */}
-                  <div className="absolute top-5 left-[12.5%] right-[12.5%] h-0.5 bg-slate-800 -z-10" />
-                  
-                  <div className="flex flex-col items-center">
-                    <div className="w-8 h-8 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center font-bold text-sm shadow-lg shadow-emerald-500/20">
-                      1
-                    </div>
-                    <span className="text-[10px] text-slate-400 mt-2 font-semibold">Submitted</span>
-                  </div>
-                  
-                  <div className="flex flex-col items-center">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-all
-                      ${request.status === 'APPROVED' || entry
-                        ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20'
-                        : request.status === 'REJECTED'
-                        ? 'bg-rose-500 text-slate-950 shadow-lg shadow-rose-500/20'
-                        : 'bg-slate-800 text-slate-400 animate-pulse'
-                      }
-                    `}>
-                      {request.status === 'REJECTED' ? '✕' : '2'}
-                    </div>
-                    <span className="text-[10px] text-slate-400 mt-2 font-semibold">
-                      {request.status === 'REJECTED' ? 'Rejected' : 'Approved'}
-                    </span>
-                  </div>
-
-                  <div className="flex flex-col items-center">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-all
-                      ${entry 
-                        ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20' 
-                        : request.status === 'APPROVED'
-                        ? 'bg-slate-800 text-slate-400 animate-pulse'
-                        : 'bg-slate-800 text-slate-600'
-                      }
-                    `}>
-                      3
-                    </div>
-                    <span className="text-[10px] text-slate-400 mt-2 font-semibold">Checked In</span>
-                  </div>
-
-                  <div className="flex flex-col items-center">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-all
-                      ${entry?.exit_time 
-                        ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20' 
-                        : 'bg-slate-800 text-slate-600'
-                      }
-                    `}>
-                      4
-                    </div>
-                    <span className="text-[10px] text-slate-400 mt-2 font-semibold">Exited</span>
-                  </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.3px' }}>
+                  Visit tracker
                 </div>
+                {/* status badge */}
+                {isRejected && <span className="status-badge rejected"><span className="status-dot rejected" />Rejected</span>}
+                {isPending  && <span className="status-badge pending"><span className="status-dot pending" />Pending</span>}
+                {isApproved && !hasEntry && <span className="status-badge approved"><span className="status-dot approved" />Approved</span>}
+                {hasEntry && !hasExit && <span className="status-badge inside"><span className="status-dot idle" />Inside</span>}
+                {hasExit && <span className="status-badge done"><span className="status-dot idle" />Completed</span>}
               </div>
 
-              {/* Detail fields */}
-              <div className="border-t border-slate-800/80 pt-6 grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Host Resident</span>
-                  <span className="text-sm font-bold text-slate-200">{residentName}</span>
-                </div>
-                <div className="space-y-1">
-                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Flat Number</span>
-                  <span className="text-sm font-bold text-slate-200">Flat {flatNumber}</span>
-                </div>
-                <div className="space-y-1">
-                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Visitor Name</span>
-                  <span className="text-sm font-bold text-slate-200">{request.visitor_name} ({request.visitor_type})</span>
-                </div>
-                <div className="space-y-1">
-                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Purpose</span>
-                  <span className="text-sm font-bold text-slate-200">{request.purpose}</span>
-                </div>
-                {request.vehicle_number && (
-                  <div className="space-y-1">
-                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Vehicle Number</span>
-                    <span className="text-sm font-bold text-slate-200">{request.vehicle_number}</span>
-                  </div>
-                )}
-                <div className="space-y-1">
-                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Total Visitors</span>
-                  <span className="text-sm font-bold text-slate-200">{request.number_of_visitors} Person(s)</span>
-                </div>
-              </div>
-
-              {/* Gate Entry details */}
-              {entry && (
-                <div className="border-t border-slate-800/80 pt-6 space-y-3">
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
-                    Security Logs
-                  </span>
-                  <div className="grid grid-cols-2 gap-4 bg-slate-950/40 p-4 rounded-2xl border border-slate-900">
-                    <div className="space-y-1">
-                      <span className="text-[10px] text-slate-500 font-bold uppercase block">Entered Gate</span>
-                      <span className="text-xs text-slate-300">
-                        {new Date(entry.entry_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-[10px] text-slate-500 font-bold uppercase block">Exited Gate</span>
-                      <span className="text-xs text-slate-300">
-                        {entry.exit_time 
-                          ? new Date(entry.exit_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                          : 'Currently Inside'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Right Side: QR Gate Pass Display OR Status instruction */}
-        <div className="md:col-span-5 space-y-6">
-          {request.status === 'PENDING' && (
-            <Card className="border-slate-800 bg-slate-900/60 backdrop-blur-xl shadow-xl p-6 text-center space-y-4">
-              <Clock className="w-12 h-12 text-amber-400 mx-auto animate-pulse" />
-              <div className="space-y-1.5">
-                <h3 className="font-bold text-md text-slate-200">Awaiting Resident Action</h3>
-                <p className="text-xs text-slate-400">
-                  Your request has been sent to flat {flatNumber}. Please wait at the security gate. This page will update automatically.
-                </p>
-              </div>
-              <div className="w-full bg-slate-950/60 p-3 rounded-xl border border-slate-850 flex items-center gap-3 justify-center text-xs text-slate-500">
-                <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-400" />
-                <span>Checking status every 3s...</span>
-              </div>
-            </Card>
-          )}
-
-          {request.status === 'REJECTED' && (
-            <Card className="border-rose-950/40 bg-rose-950/10 backdrop-blur-xl shadow-xl p-6 text-center space-y-4 border">
-              <XCircle className="w-12 h-12 text-rose-500 mx-auto" />
-              <div className="space-y-1.5">
-                <h3 className="font-bold text-md text-rose-400">Access Request Denied</h3>
-                <p className="text-xs text-slate-400">
-                  The resident of flat {flatNumber} has declined your access request. Please contact security or try registering again.
-                </p>
-              </div>
-            </Card>
-          )}
-
-          {request.status === 'APPROVED' && (
-            <div className="space-y-6">
-              {/* QR Pass */}
-              <Card className="border-slate-800 bg-slate-900/60 backdrop-blur-xl shadow-xl p-6 text-center space-y-4">
-                <div className="space-y-1">
-                  <h3 className="font-bold text-md text-slate-200 flex items-center justify-center gap-2">
-                    <QrCode className="w-4 h-4 text-emerald-400" />
-                    QR Access Pass
-                  </h3>
-                  <p className="text-[10px] text-slate-500">Show this QR code to the gate guard to check in</p>
-                </div>
-                
-                <div className="bg-white p-4 rounded-2xl inline-block mx-auto shadow-inner border border-slate-200">
-                  {qrCodeDataUrl ? (
-                    <img src={qrCodeDataUrl} alt="Visitor Pass QR" className="w-[180px] h-[180px]" />
-                  ) : (
-                    <div className="w-[180px] h-[180px] bg-slate-100 animate-pulse flex items-center justify-center text-slate-400 text-xs">
-                      Generating...
-                    </div>
-                  )}
-                </div>
-
-                <Button 
-                  onClick={handleDownloadQR}
-                  className="w-full bg-slate-950 hover:bg-slate-900 border border-slate-800 text-slate-200 hover:text-slate-100 gap-2 rounded-xl text-xs py-5 transition-colors"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>Download Pass (PNG)</span>
-                </Button>
-
-                <Button 
-                  onClick={() => {
-                    if (typeof window !== 'undefined') {
-                      navigator.clipboard.writeText(`${window.location.origin}/public/tracking/${request.id}`);
-                      toast.success('Pass link copied to clipboard!');
-                    }
-                  }}
-                  className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 gap-2 rounded-xl text-xs py-5 transition-colors font-bold mt-2"
-                >
-                  <Link2 className="w-4 h-4" />
-                  <span>Copy Pass Link</span>
-                </Button>
-              </Card>
-
-              {/* Digital Badge Bonus Feature */}
-              <div className="border border-slate-800/80 bg-gradient-to-b from-indigo-950/20 to-slate-900/60 backdrop-blur-xl rounded-3xl p-5 shadow-xl relative overflow-hidden text-slate-200">
-                <div className="absolute top-[-30px] right-[-30px] w-20 h-20 rounded-full bg-indigo-500/20 blur-xl" />
-                <div className="flex items-center gap-2 border-b border-slate-800 pb-3 mb-3">
-                  <Shield className="w-4 h-4 text-emerald-400" />
-                  <span className="text-[10px] font-extrabold tracking-widest text-emerald-400 uppercase">
-                    Green Glen Heights - Visitor
-                  </span>
-                </div>
-                <div className="space-y-2 text-xs">
-                  <div className="flex justify-between font-bold text-sm">
-                    <span className="text-slate-100">{request.visitor_name}</span>
-                    <span className="text-emerald-400 uppercase font-mono text-[10px]">{request.visitor_type}</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-400 border-t border-slate-850 pt-2">
-                    <div>
-                      <span>Flat:</span> <strong className="text-slate-200">{flatNumber}</strong>
-                    </div>
-                    <div>
-                      <span>Phone:</span> <strong className="text-slate-200">{request.visitor_phone.slice(-10)}</strong>
-                    </div>
-                    <div>
-                      <span>Duration:</span> <strong className="text-slate-200">{request.expected_duration} Min</strong>
-                    </div>
-                    {request.vehicle_number && (
-                      <div>
-                        <span>Vehicle:</span> <strong className="text-slate-200">{request.vehicle_number}</strong>
-                      </div>
-                    )}
-                  </div>
-                </div>
+              {/* auto-refresh indicator */}
+              <div className="live-row" style={{ marginTop: 8 }}>
+                <span className="live-dot" />
+                Refreshing every 3 seconds
               </div>
             </div>
-          )}
-        </div>
-      </main>
 
-      {/* Footer */}
-      <footer className="max-w-4xl mx-auto w-full text-center text-[10px] text-slate-600 pt-6 border-t border-slate-900">
-        In case of difficulty, please walk up to the gate security booth and refer request code: {request.id}.
-      </footer>
-    </div>
+            <div className="card-body">
+
+              {/* ── Animated timeline ── */}
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 16 }}>
+                  Approval timeline
+                </div>
+
+                <div className="timeline">
+                  {STEPS.map((s, i) => {
+                    const stepNum = i + 1;
+                    const isDone   = !isRejected && step > stepNum;
+                    const isActive = !isRejected && step === stepNum;
+                    const isErrStep = isRejected && stepNum === 2;
+
+                    let nodeClass = 'waiting';
+                    if (isDone)    nodeClass = 'done';
+                    if (isActive)  nodeClass = 'active pulse';
+                    if (isErrStep) nodeClass = 'error';
+
+                    return (
+                      <div key={i} className={`tl-row ${isDone ? 'done' : isActive ? 'active' : ''}`}>
+                        <div className="tl-left">
+                          <div className={`tl-node ${nodeClass}`}>
+                            {isDone ? (
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="20 6 9 17 4 12"/>
+                              </svg>
+                            ) : isErrStep ? (
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                              </svg>
+                            ) : stepNum}
+                          </div>
+                        </div>
+                        <div className="tl-right">
+                          <div className={`tl-step-label ${!isDone && !isActive && !isErrStep ? 'muted' : ''}`}>
+                            {isErrStep ? 'Rejected' : s.label}
+                          </div>
+                          <div className="tl-step-sub">
+                            {isErrStep ? 'Resident declined request' : s.sub}
+                          </div>
+                          {isDone && stepNum === 1 && (
+                            <div className="tl-step-time">
+                              {new Date(request.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          )}
+                          {isDone && stepNum === 3 && entry && (
+                            <div className="tl-step-time">
+                              {new Date(entry.entry_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          )}
+                          {isDone && stepNum === 4 && entry?.exit_time && (
+                            <div className="tl-step-time">
+                              {new Date(entry.exit_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="divider" />
+
+              {/* ── Visitor details ── */}
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 14 }}>
+                Visit details
+              </div>
+              <div className="detail-grid">
+                <div className="detail-item">
+                  <div className="detail-key">Host resident</div>
+                  <div className="detail-val">{residentName}</div>
+                </div>
+                <div className="detail-item">
+                  <div className="detail-key">Flat number</div>
+                  <div className="detail-val">Flat {flatNumber}</div>
+                </div>
+                <div className="detail-item">
+                  <div className="detail-key">Visitor</div>
+                  <div className="detail-val">{request.visitor_name}</div>
+                </div>
+                <div className="detail-item">
+                  <div className="detail-key">Type</div>
+                  <div className="detail-val">{request.visitor_type}</div>
+                </div>
+                <div className="detail-item">
+                  <div className="detail-key">Purpose</div>
+                  <div className="detail-val">{request.purpose}</div>
+                </div>
+                <div className="detail-item">
+                  <div className="detail-key">Party size</div>
+                  <div className="detail-val">{request.number_of_visitors} person{request.number_of_visitors !== 1 ? 's' : ''}</div>
+                </div>
+                {request.vehicle_number && (
+                  <div className="detail-item">
+                    <div className="detail-key">Vehicle</div>
+                    <div className="detail-val">{request.vehicle_number}</div>
+                  </div>
+                )}
+                <div className="detail-item">
+                  <div className="detail-key">Est. duration</div>
+                  <div className="detail-val">{request.expected_duration} min</div>
+                </div>
+              </div>
+
+              {/* ── Security log ── */}
+              {entry && (
+                <>
+                  <div className="divider" />
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12 }}>
+                    Security log
+                  </div>
+                  <div className="log-row">
+                    <div className="log-cell">
+                      <div className="log-cell-key">Entered gate</div>
+                      <div className="log-cell-val">
+                        {new Date(entry.entry_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </div>
+                    <div className="log-cell">
+                      <div className="log-cell-key">Exited gate</div>
+                      <div className={`log-cell-val ${!entry.exit_time ? 'inside' : ''}`}>
+                        {entry.exit_time
+                          ? new Date(entry.exit_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                          : 'Currently inside'}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* ── Right: QR / Status panel ── */}
+          <div className="right-col">
+
+            {isPending && (
+              <div className="pending-card">
+                <div className="pending-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+                  </svg>
+                </div>
+                <div className="pending-title">Waiting for resident</div>
+                <div className="pending-desc">
+                  Your request has been sent to flat {flatNumber}. Please wait at the security gate.
+                </div>
+                <div className="refresh-pill">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin 2s linear infinite' }}>
+                    <path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                  </svg>
+                  Checking every 3 seconds
+                </div>
+              </div>
+            )}
+
+            {isRejected && (
+              <div className="rejected-card">
+                <div className="rejected-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+                  </svg>
+                </div>
+                <div className="rejected-title">Access denied</div>
+                <div className="rejected-desc">
+                  The resident of flat {flatNumber} has declined this request. Please contact security or try again.
+                </div>
+              </div>
+            )}
+
+            {(isApproved || hasEntry) && (
+              <>
+                {/* QR Pass */}
+                <div className="qr-card">
+                  <div className="qr-card-header">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>
+                      <path d="M14 14h2v2m0 3h3m-3-3v3"/>
+                    </svg>
+                    <span className="qr-card-title">Gate pass — show to guard</span>
+                  </div>
+                  <div className="qr-card-body">
+                    <div className="qr-wrap">
+                      {qrDataUrl
+                        ? <img src={qrDataUrl} alt="Visitor QR pass" width={200} height={200} style={{ borderRadius: 6, display: 'block' }} />
+                        : <div className="qr-placeholder">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#9E9B96" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>
+                            </svg>
+                          </div>
+                      }
+                    </div>
+                    <div className="pass-code">
+                      <span>{request.id}</span>
+                      <button
+                        className="copy-btn"
+                        onClick={() => { navigator.clipboard.writeText(request.id); toast.success('Pass code copied'); }}
+                        title="Copy code"
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+                        </svg>
+                      </button>
+                    </div>
+                    <div className="qr-hint">Scan at the gate scanner or read the pass code aloud</div>
+
+                    {/* Neumorphic download — only this button gets the treatment */}
+                    <button className="btn-neu" onClick={downloadQR}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                      </svg>
+                      Save pass as image
+                    </button>
+                  </div>
+                </div>
+
+                {/* Visitor badge */}
+                <div className="badge-card">
+                  <div className="badge-header">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 2L4 6v6c0 5.25 3.5 10.15 8 11.35C16.5 22.15 20 17.25 20 12V6l-8-4z"/>
+                    </svg>
+                    <span className="badge-header-text">Visitor badge — Green Glen Heights</span>
+                  </div>
+                  <div className="badge-body">
+                    <div className="badge-name">{request.visitor_name}</div>
+                    <div className="badge-type">{request.visitor_type}</div>
+                    <div className="badge-grid">
+                      <div className="badge-cell">
+                        <div className="badge-cell-key">Host flat</div>
+                        <div className="badge-cell-val">Flat {flatNumber}</div>
+                      </div>
+                      <div className="badge-cell">
+                        <div className="badge-cell-key">Phone</div>
+                        <div className="badge-cell-val">{request.visitor_phone.slice(-10)}</div>
+                      </div>
+                      <div className="badge-cell">
+                        <div className="badge-cell-key">Duration</div>
+                        <div className="badge-cell-val">{request.expected_duration} min</div>
+                      </div>
+                      {request.vehicle_number && (
+                        <div className="badge-cell">
+                          <div className="badge-cell-key">Vehicle</div>
+                          <div className="badge-cell-val">{request.vehicle_number}</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+          </div>
+        </main>
+
+        {/* ── Footer ── */}
+        <footer className="footer">
+          If you need help, show request code <strong style={{ fontFamily: 'ui-monospace, monospace' }}>{request.id}</strong> to the security desk.
+        </footer>
+      </div>
+    </>
   );
 }

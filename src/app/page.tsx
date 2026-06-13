@@ -1,220 +1,478 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { 
-  ShieldCheck, 
-  QrCode, 
-  Smartphone, 
-  BellRing, 
-  BarChart3, 
-  Users2, 
-  FileSpreadsheet, 
-  ChevronRight, 
-  ArrowRight,
-  Sparkles,
-  Home,
-  Key
-} from 'lucide-react';
 
 export default function LandingPage() {
   const router = useRouter();
+  const [activeCard, setActiveCard] = useState<number | null>(null);
+  const [time, setTime] = useState('');
+
+  useEffect(() => {
+    const update = () => {
+      const now = new Date();
+      setTime(now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }));
+    };
+    update();
+    const t = setInterval(update, 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const portals = [
+    {
+      id: 0,
+      label: 'Visitor Check-In',
+      sub: 'Self-entry form & live pass tracking',
+      icon: (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>
+          <path d="M14 14h2v2m0 3h3m-3-3v3"/>
+        </svg>
+      ),
+      color: '#5B8E85',
+      bg: '#EBF4F2',
+      href: '/public/visitor/apt-1',
+      step: '01',
+    },
+    {
+      id: 1,
+      label: 'Resident Dashboard',
+      sub: 'Approve or reject gate requests',
+      icon: (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 9.5L12 4l9 5.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/>
+          <path d="M9 21V12h6v9"/>
+        </svg>
+      ),
+      color: '#7B6FAB',
+      bg: '#F0EDF8',
+      href: '/resident/dashboard',
+      step: '02',
+    },
+    {
+      id: 2,
+      label: 'Guard Terminal',
+      sub: 'Scan passes & log entry / exit',
+      icon: (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 2L4 6v6c0 5.25 3.5 10.15 8 11.35C16.5 22.15 20 17.25 20 12V6l-8-4z"/>
+          <path d="M9 12l2 2 4-4"/>
+        </svg>
+      ),
+      color: '#B07A3E',
+      bg: '#F7F0E6',
+      href: '/guard/dashboard',
+      step: '03',
+    },
+    {
+      id: 3,
+      label: 'Admin Office',
+      sub: 'Analytics, logs & roster management',
+      icon: (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 3h7v7H3zm11 0h7v7h-7zM3 14h7v7H3zm11 3h2m2 0h2m-3-3v2m0 2v2"/>
+        </svg>
+      ),
+      color: '#5B7FAB',
+      bg: '#EBF0F7',
+      href: '/admin/dashboard',
+      step: '04',
+    },
+  ];
+
+  const features = [
+    {
+      icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>
+        </svg>
+      ),
+      title: 'Real-time approvals',
+      body: 'Residents receive an instant notification when someone arrives at the gate, and approve or reject with one tap.',
+    },
+    {
+      icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>
+          <path d="M14 14h2v2m0 3h3m-3-3v3"/>
+        </svg>
+      ),
+      title: 'Touchless QR passes',
+      body: 'Every approved visit generates a unique QR pass. Guards scan it at the gate — no paperwork, no delays.',
+    },
+    {
+      icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 3h18v5H3zm0 8h18v10H3zm4 5h10"/>
+        </svg>
+      ),
+      title: 'Complete audit trail',
+      body: 'Every entry and exit is logged with timestamps. Exportable reports for committee reviews and safety audits.',
+    },
+  ];
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 relative overflow-hidden flex flex-col justify-between">
-      {/* Background gradients */}
-      <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-emerald-500/10 blur-[130px] pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-500/10 blur-[130px] pointer-events-none" />
+    <>
+      <style>{`
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+          --base: #E8E4DD;
+          --surface: #F0EDE8;
+          --surface-up: #F5F2EE;
+          --shadow-dark: rgba(0,0,0,0.13);
+          --shadow-light: rgba(255,255,255,0.85);
+          --text-primary: #2A2825;
+          --text-secondary: #6B6760;
+          --text-muted: #9E9B96;
+          --teal: #4E8079;
+          --teal-light: #EBF4F2;
+          --radius: 20px;
+        }
+        body { background: var(--surface); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
 
-      {/* Navigation Header */}
-      <header className="max-w-7xl mx-auto w-full px-6 h-20 flex items-center justify-between z-10 border-b border-slate-900 bg-slate-950/50 backdrop-blur-md sticky top-0">
-        <div className="flex items-center gap-2">
-          <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-            <ShieldCheck className="w-6 h-6" />
-          </div>
-          <span className="font-extrabold text-xl tracking-tight bg-gradient-to-r from-emerald-400 to-indigo-400 bg-clip-text text-transparent">
-            GateKeeper VMS
-          </span>
-        </div>
-        <div className="flex items-center gap-4">
-          <Button 
-            variant="ghost" 
-            onClick={() => router.push('/login')} 
-            className="text-slate-400 hover:text-slate-100 hover:bg-slate-900 rounded-xl"
-          >
-            Sign In
-          </Button>
-          <Button 
-            onClick={() => router.push('/register')} 
-            className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-semibold px-5 rounded-xl shadow-lg shadow-emerald-500/10"
-          >
-            Register
-          </Button>
-        </div>
-      </header>
+        .neu-raised {
+          background: var(--surface-up);
+          box-shadow: 6px 6px 14px var(--shadow-dark), -6px -6px 14px var(--shadow-light);
+          border-radius: var(--radius);
+        }
+        .neu-inset {
+          background: var(--base);
+          box-shadow: inset 4px 4px 10px var(--shadow-dark), inset -4px -4px 10px var(--shadow-light);
+          border-radius: var(--radius);
+        }
+        .neu-flat {
+          background: var(--surface);
+          box-shadow: 4px 4px 10px var(--shadow-dark), -4px -4px 10px var(--shadow-light);
+          border-radius: 14px;
+        }
 
-      {/* Hero Section */}
-      <main className="max-w-7xl mx-auto w-full px-6 py-12 md:py-20 z-10 grow flex flex-col justify-center">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-          
-          {/* Left Text */}
-          <div className="lg:col-span-7 space-y-6 text-left">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm">
-              <Sparkles className="w-4 h-4 text-emerald-400 animate-pulse" />
-              <span>Next-Gen Apartment Security</span>
+        .page { min-height: 100vh; background: var(--surface); color: var(--text-primary); }
+
+        .header {
+          position: sticky; top: 0; z-index: 100;
+          background: rgba(240,237,232,0.85);
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
+          border-bottom: 1px solid rgba(0,0,0,0.06);
+        }
+        .header-inner {
+          max-width: 1180px; margin: 0 auto; padding: 0 32px;
+          height: 68px; display: flex; align-items: center; justify-content: space-between;
+        }
+        .logo { display: flex; align-items: center; gap: 2px; }
+        .logo-icon {
+          border-radius: 100%;
+          background: var(--surface-up);
+          box-shadow: 3px 3px 8px var(--shadow-dark), -3px -3px 8px var(--shadow-light);
+          display: flex; align-items: center; justify-content: center; color: var(--teal);
+        }
+        .logo-text { font-size: 17px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.3px; }
+        .logo-text span { color: var(--teal); }
+        .header-nav { display: flex; align-items: center; gap: 10px; }
+        .btn-ghost {
+          padding: 8px 18px; border-radius: 10px; border: none; background: transparent;
+          font-size: 14px; color: var(--text-secondary); cursor: pointer;
+          transition: all 0.2s;
+        }
+        .btn-ghost:hover { background: var(--base); color: var(--text-primary); }
+        .btn-primary {
+          padding: 9px 22px; border-radius: 12px; border: none;
+          background: var(--surface-up);
+          box-shadow: 4px 4px 10px var(--shadow-dark), -4px -4px 10px var(--shadow-light);
+          font-size: 14px; font-weight: 600; color: var(--teal); cursor: pointer;
+          transition: all 0.15s;
+        }
+        .btn-primary:hover { box-shadow: 5px 5px 12px var(--shadow-dark), -5px -5px 12px var(--shadow-light); }
+        .btn-primary:active {
+          box-shadow: inset 3px 3px 7px var(--shadow-dark), inset -3px -3px 7px var(--shadow-light);
+          color: #3A6B65;
+        }
+
+        .hero { max-width: 1180px; margin: 0 auto; padding: 72px 32px 60px; }
+        .hero-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center; }
+
+        .eyebrow {
+          display: inline-flex; align-items: center; gap: 7px;
+          padding: 6px 14px; border-radius: 30px;
+          background: var(--surface-up);
+          box-shadow: 3px 3px 8px var(--shadow-dark), -3px -3px 8px var(--shadow-light);
+          font-size: 12px; font-weight: 600; color: var(--teal); letter-spacing: 0.5px;
+          text-transform: uppercase; margin-bottom: 28px;
+        }
+        .dot-live {
+          width: 7px; height: 7px; border-radius: 50%; background: #5BAE8E;
+          animation: pulse-dot 2s ease-in-out infinite;
+        }
+        @keyframes pulse-dot {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.5; transform: scale(0.8); }
+        }
+
+        h1 {
+          font-size: clamp(36px, 4.5vw, 54px);
+          font-weight: 800; line-height: 1.12;
+          letter-spacing: -1.5px; color: var(--text-primary);
+          margin-bottom: 20px;
+        }
+        h1 .accent { color: var(--teal); }
+        .hero-body {
+          font-size: 16px; line-height: 1.75; color: var(--text-secondary);
+          max-width: 440px; margin-bottom: 36px;
+        }
+        .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+        .cta-main {
+          padding: 15px 30px; border-radius: 16px; border: none; cursor: pointer;
+          background: var(--surface-up);
+          box-shadow: 6px 6px 14px var(--shadow-dark), -6px -6px 14px var(--shadow-light);
+          font-size: 15px; font-weight: 700; color: var(--teal);
+          display: flex; align-items: center; gap: 10px;
+          transition: all 0.18s;
+        }
+        .cta-main:hover { box-shadow: 8px 8px 18px var(--shadow-dark), -8px -8px 18px var(--shadow-light); }
+        .cta-main:active {
+          box-shadow: inset 4px 4px 10px var(--shadow-dark), inset -4px -4px 10px var(--shadow-light);
+        }
+        .cta-main svg { transition: transform 0.2s; }
+        .cta-main:hover svg { transform: translateX(3px); }
+        .cta-secondary {
+          padding: 15px 24px; border-radius: 16px; border: none; cursor: pointer;
+          background: var(--surface);
+          box-shadow: inset 3px 3px 7px var(--shadow-dark), inset -3px -3px 7px var(--shadow-light);
+          font-size: 15px; font-weight: 600; color: var(--text-secondary);
+          transition: all 0.18s;
+        }
+        .cta-secondary:hover { color: var(--text-primary); }
+
+        .portal-panel {
+          background: var(--surface-up);
+          box-shadow: 8px 8px 20px var(--shadow-dark), -8px -8px 20px var(--shadow-light);
+          border-radius: 28px; padding: 28px;
+        }
+        .portal-header { margin-bottom: 20px; }
+        .portal-title { font-size: 15px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; }
+        .portal-sub { font-size: 12px; color: var(--text-muted); }
+        .portal-time {
+          font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums;
+          display: flex; align-items: center; gap: 6px; margin-top: 6px;
+        }
+
+        .portal-cards { display: flex; flex-direction: column; gap: 10px; }
+        .portal-card {
+          display: flex; align-items: center; gap: 14px;
+          padding: 16px 18px; border-radius: 18px; border: none; cursor: pointer;
+          text-align: left; width: 100%;
+          background: var(--surface-up);
+          box-shadow: 4px 4px 10px var(--shadow-dark), -4px -4px 10px var(--shadow-light);
+          transition: all 0.18s;
+          position: relative; overflow: hidden;
+        }
+        .portal-card:hover {
+          box-shadow: 6px 6px 14px var(--shadow-dark), -6px -6px 14px var(--shadow-light);
+          transform: translateY(-1px);
+        }
+        .portal-card:active, .portal-card.active {
+          box-shadow: inset 3px 3px 8px var(--shadow-dark), inset -3px -3px 8px var(--shadow-light);
+          transform: translateY(0);
+        }
+        .portal-icon {
+          width: 44px; height: 44px; border-radius: 14px; flex-shrink: 0;
+          display: flex; align-items: center; justify-content: center;
+          box-shadow: inset 2px 2px 5px rgba(0,0,0,0.1), inset -2px -2px 5px rgba(255,255,255,0.7);
+        }
+        .portal-text { flex: 1; }
+        .portal-card-label { font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 2px; }
+        .portal-card-sub { font-size: 11px; color: var(--text-muted); line-height: 1.4; }
+        .portal-step {
+          font-size: 11px; font-weight: 700; color: var(--text-muted);
+          font-variant-numeric: tabular-nums; opacity: 0.5;
+        }
+        .portal-arrow { color: var(--text-muted); flex-shrink: 0; transition: transform 0.2s, color 0.2s; }
+        .portal-card:hover .portal-arrow { transform: translateX(3px); }
+
+        .divider { max-width: 1180px; margin: 0 auto; padding: 0 32px; }
+        .divider-line {
+          height: 1px; background: linear-gradient(90deg, transparent, rgba(0,0,0,0.08), transparent);
+          margin: 0;
+        }
+
+        .features { max-width: 1180px; margin: 0 auto; padding: 60px 32px; }
+        .features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+        .feature-card {
+          padding: 28px; border-radius: 22px;
+          background: var(--surface-up);
+          box-shadow: 5px 5px 12px var(--shadow-dark), -5px -5px 12px var(--shadow-light);
+        }
+        .feature-icon {
+          width: 42px; height: 42px; border-radius: 13px;
+          background: var(--base);
+          box-shadow: inset 3px 3px 7px var(--shadow-dark), inset -3px -3px 7px var(--shadow-light);
+          display: flex; align-items: center; justify-content: center;
+          color: var(--teal); margin-bottom: 18px;
+        }
+        .feature-title { font-size: 15px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; }
+        .feature-body { font-size: 13px; color: var(--text-secondary); line-height: 1.7; }
+
+        .stats { max-width: 1180px; margin: 0 auto; padding: 0 32px 60px; }
+        .stats-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
+        .stat-card {
+          padding: 22px 26px; border-radius: 18px;
+          background: var(--base);
+          box-shadow: inset 3px 3px 8px var(--shadow-dark), inset -3px -3px 8px var(--shadow-light);
+          text-align: center;
+        }
+        .stat-num { font-size: 32px; font-weight: 800; color: var(--teal); letter-spacing: -1px; }
+        .stat-label { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+        .footer {
+          border-top: 1px solid rgba(0,0,0,0.06);
+          background: var(--surface);
+        }
+        .footer-inner {
+          max-width: 1180px; margin: 0 auto; padding: 28px 32px;
+          display: flex; justify-content: space-between; align-items: center;
+          flex-wrap: wrap; gap: 12px;
+        }
+        .footer-copy { font-size: 12px; color: var(--text-muted); }
+        .footer-links { display: flex; gap: 20px; }
+        .footer-link { font-size: 12px; color: var(--text-muted); text-decoration: none; transition: color 0.15s; }
+        .footer-link:hover { color: var(--text-secondary); }
+
+        @media (max-width: 768px) {
+          .hero-grid { grid-template-columns: 1fr; gap: 40px; }
+          .features-grid { grid-template-columns: 1fr; }
+          .stats-row { grid-template-columns: 1fr; }
+          h1 { font-size: 36px; }
+          .header-inner { padding: 0 20px; }
+          .hero { padding: 48px 20px 40px; }
+        }
+      `}</style>
+
+      <div className="page">
+        {/* Header */}
+        <header className="header">
+          <div className="header-inner">
+            <div className="logo">
+              <img src="/logo-icon.png" alt="logo" className="w-10 h-full" />
+              <span className="logo-text">Gate<span>Keeper</span></span>
             </div>
-            
-            <h1 className="text-4xl md:text-6xl font-black tracking-tight leading-tight">
-              Replace Manual Registers with{' '}
-              <span className="bg-gradient-to-r from-emerald-400 via-teal-400 to-indigo-400 bg-clip-text text-transparent">
-                QR-Based Approvals
-              </span>
-            </h1>
-            
-            <p className="text-slate-400 text-base md:text-lg max-w-xl leading-relaxed">
-              Ditch the paper registers. Empower residents to pre-approve guests, receive real-time entry alerts, and provide security guards with an instant, touchless QR-pass scanning check-in portal.
-            </p>
-
-            <div className="flex flex-col sm:flex-row gap-4 pt-2">
-              {/* Main Visitor Portal Redirect */}
-              <Button
-                size="lg"
-                onClick={() => router.push('/public/visitor/apt-1')}
-                className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-slate-950 font-bold px-8 py-6 text-md rounded-2xl shadow-xl shadow-emerald-500/10 flex items-center gap-2 group"
-              >
-                <span>Visitor Gate Check-In</span>
-                <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
-              </Button>
-              
-              <Button
-                size="lg"
-                variant="outline"
-                onClick={() => router.push('/login')}
-                className="border-slate-800 hover:bg-slate-900 text-slate-300 font-semibold px-8 py-6 rounded-2xl"
-              >
-                Open Dashboard Console
-              </Button>
-            </div>
+            <nav className="header-nav">
+              <button className="btn-ghost" onClick={() => router.push('/login')}>Sign in</button>
+              <button className="btn-primary" onClick={() => router.push('/register')}>Get access</button>
+            </nav>
           </div>
+        </header>
 
-          {/* Right Cards: Quick access panel for grading */}
-          <div className="lg:col-span-5 relative">
-            <div className="absolute inset-0 bg-indigo-500/10 rounded-3xl blur-2xl -z-10" />
-            <div className="border border-slate-800 bg-slate-900/60 backdrop-blur-xl rounded-3xl p-6 shadow-2xl space-y-6">
-              <div className="space-y-1">
-                <h3 className="font-bold text-lg text-slate-100">Portal Entryways</h3>
-                <p className="text-xs text-slate-500">Test individual roles and features using the pre-seeded demo environment</p>
+        {/* Hero */}
+        <main className="hero">
+          <div className="hero-grid">
+            {/* Left */}
+            <div>
+              <div className="eyebrow">
+                <span className="dot-live" />
+                Visitor management system
               </div>
-
-              <div className="space-y-3">
-                <button
-                  onClick={() => router.push('/public/visitor/apt-1')}
-                  className="w-full flex items-center justify-between p-4 rounded-2xl bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/10 hover:border-emerald-500/30 transition-all group text-left"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 group-hover:scale-105 transition-transform">
-                      <QrCode className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-sm text-slate-200">1. Visitor Gate Entry</h4>
-                      <p className="text-[11px] text-slate-500">Self check-in form & live request tracking</p>
-                    </div>
-                  </div>
-                  <ChevronRight className="w-5 h-5 text-slate-500 group-hover:text-emerald-400 transition-colors" />
+              <h1>
+                A smarter gate<br />
+                for every <span className="accent">resident</span>
+              </h1>
+              <p className="hero-body">
+                Replace paper registers with a digital concierge. Residents approve visitors from their phone, guards scan a QR code, and the gate opens — all in under 30 seconds.
+              </p>
+              <div className="hero-actions">
+                <button className="cta-main" onClick={() => router.push('/public/visitor/apt-1')}>
+                  Visitor check-in
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                  </svg>
                 </button>
-
-                <button
-                  onClick={() => router.push('/resident/dashboard')}
-                  className="w-full flex items-center justify-between p-4 rounded-2xl bg-indigo-500/5 hover:bg-indigo-500/10 border border-indigo-500/10 hover:border-indigo-500/30 transition-all group text-left"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400 group-hover:scale-105 transition-transform">
-                      <Home className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-sm text-slate-200">2. Resident Dashboard</h4>
-                      <p className="text-[11px] text-slate-500">Approve or reject gate requests in real-time</p>
-                    </div>
-                  </div>
-                  <ChevronRight className="w-5 h-5 text-slate-500 group-hover:text-indigo-400 transition-colors" />
-                </button>
-
-                <button
-                  onClick={() => router.push('/guard/dashboard')}
-                  className="w-full flex items-center justify-between p-4 rounded-2xl bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/10 hover:border-amber-500/30 transition-all group text-left"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 group-hover:scale-105 transition-transform">
-                      <Key className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-sm text-slate-200">3. Guard Terminal</h4>
-                      <p className="text-[11px] text-slate-500">Scan visitor QR codes & log check-in/outs</p>
-                    </div>
-                  </div>
-                  <ChevronRight className="w-5 h-5 text-slate-500 group-hover:text-amber-400 transition-colors" />
-                </button>
-
-                <button
-                  onClick={() => router.push('/admin/dashboard')}
-                  className="w-full flex items-center justify-between p-4 rounded-2xl bg-blue-500/5 hover:bg-blue-500/10 border border-blue-500/10 hover:border-blue-500/30 transition-all group text-left"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-400 group-hover:scale-105 transition-transform">
-                      <ShieldCheck className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-sm text-slate-200">4. Admin Office</h4>
-                      <p className="text-[11px] text-slate-500">Analytics, records audits & rosters manager</p>
-                    </div>
-                  </div>
-                  <ChevronRight className="w-5 h-5 text-slate-500 group-hover:text-blue-400 transition-colors" />
+                <button className="cta-secondary" onClick={() => router.push('/login')}>
+                  Open dashboard
                 </button>
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* Feature Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-24">
-          <div className="p-6 rounded-2xl border border-slate-900 bg-slate-900/20 text-left space-y-3">
-            <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-400 inline-block">
-              <QrCode className="w-6 h-6" />
+            {/* Right — Portal Panel */}
+            <div className="portal-panel">
+              <div className="portal-header">
+                <div className="portal-title">Portal entryways</div>
+                <div className="portal-sub">Test each role in the demo environment</div>
+                <div className="portal-time">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="9"/><path d="M12 7v5l2 2"/>
+                  </svg>
+                  Live · {time}
+                </div>
+              </div>
+              <div className="portal-cards">
+                {portals.map((p) => (
+                  <button
+                    key={p.id}
+                    className={`portal-card${activeCard === p.id ? ' active' : ''}`}
+                    onMouseDown={() => setActiveCard(p.id)}
+                    onMouseUp={() => { setActiveCard(null); router.push(p.href); }}
+                    onMouseLeave={() => setActiveCard(null)}
+                  >
+                    <div className="portal-icon" style={{ background: p.bg, color: p.color }}>
+                      {p.icon}
+                    </div>
+                    <div className="portal-text">
+                      <div className="portal-card-label">{p.label}</div>
+                      <div className="portal-card-sub">{p.sub}</div>
+                    </div>
+                    <span className="portal-step">{p.step}</span>
+                    <svg className="portal-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M9 18l6-6-6-6"/>
+                    </svg>
+                  </button>
+                ))}
+              </div>
             </div>
-            <h4 className="text-lg font-bold text-slate-200">Touchless QR Passes</h4>
-            <p className="text-sm text-slate-400">Approved visitors get an instant QR pass sent directly to their phone, allowing guard scans for instant gate entry.</p>
           </div>
-          
-          <div className="p-6 rounded-2xl border border-slate-900 bg-slate-900/20 text-left space-y-3">
-            <div className="p-3 rounded-xl bg-indigo-500/10 text-indigo-400 inline-block">
-              <BellRing className="w-6 h-6" />
-            </div>
-            <h4 className="text-lg font-bold text-slate-200">Real-Time Ring Alerts</h4>
-            <p className="text-sm text-slate-400">Residents are notified instantly when a visitor arrives, approving or rejecting with a single tap from their device.</p>
-          </div>
+        </main>
 
-          <div className="p-6 rounded-2xl border border-slate-900 bg-slate-900/20 text-left space-y-3">
-            <div className="p-3 rounded-xl bg-blue-500/10 text-blue-400 inline-block">
-              <BarChart3 className="w-6 h-6" />
-            </div>
-            <h4 className="text-lg font-bold text-slate-200">Analytics & Audits</h4>
-            <p className="text-sm text-slate-400">Complete historical graphs, daily reports, and security audit logs of who entered and exited the premises.</p>
+        {/* Stats */}
+        <section className="stats">
+          <div className="stats-row">
+            {[
+              { num: '25', label: 'Pre-seeded flats across 5 floors' },
+              { num: '< 30s', label: 'Average visitor approval time' },
+              { num: '100%', label: 'Audit coverage, zero paper trail' },
+            ].map((s, i) => (
+              <div key={i} className="stat-card">
+                <div className="stat-num">{s.num}</div>
+                <div className="stat-label">{s.label}</div>
+              </div>
+            ))}
           </div>
-        </div>
-      </main>
+        </section>
 
-      {/* Footer */}
-      <footer className="border-t border-slate-900 bg-slate-950/80 py-8 z-10">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-4 text-slate-500 text-xs">
-          <p>© 2026 GateKeeper VMS. Built for secure, digital residential environments.</p>
-          <div className="flex gap-4">
-            <a href="#" className="hover:underline">Privacy Policy</a>
-            <a href="#" className="hover:underline">Terms of Service</a>
-            <a href="#" className="hover:underline">Security Protocols</a>
+        <div className="divider"><div className="divider-line" /></div>
+
+        {/* Features */}
+        <section className="features">
+          <div className="features-grid">
+            {features.map((f, i) => (
+              <div key={i} className="feature-card">
+                <div className="feature-icon">{f.icon}</div>
+                <div className="feature-title">{f.title}</div>
+                <div className="feature-body">{f.body}</div>
+              </div>
+            ))}
           </div>
-        </div>
-      </footer>
-    </div>
+        </section>
+
+        {/* Footer */}
+        <footer className="footer">
+          <div className="footer-inner">
+            <span className="footer-copy">© 2026 GateKeeper VMS — Built for secure residential communities</span>
+            <div className="footer-links">
+              <a href="#" className="footer-link">Privacy</a>
+              <a href="#" className="footer-link">Terms</a>
+              <a href="#" className="footer-link">Security</a>
+            </div>
+          </div>
+        </footer>
+      </div>
+    </>
   );
 }
