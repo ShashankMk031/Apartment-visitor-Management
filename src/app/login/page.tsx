@@ -141,10 +141,10 @@ function LoginPageContent() {
               <div className="w-6 h-6 rounded-md bg-[#F0EDE8] border border-white flex items-center justify-center shadow-xs">
                 <LogIn className="w-3.5 h-3.5 text-[#4E8079]" strokeWidth={2} />
               </div>
-              Console Authentication
+              Authentication Login
             </CardTitle>
             <CardDescription className="text-xs text-[#6E685E] pt-0.5">
-              Provide authorized node credentials below
+              Enter your email and password to log in
             </CardDescription>
           </CardHeader>
           
@@ -159,7 +159,7 @@ function LoginPageContent() {
             <form onSubmit={handleLogin} className="space-y-4">
               {/* Micro-Indented Real-World Input Box */}
               <div className="space-y-1.5">
-                <Label htmlFor="email" className="text-[10px] font-bold text-[#6E685E] uppercase tracking-wider font-mono pl-0.5">Email Matrix</Label>
+                <Label htmlFor="email" className="text-[10px] font-bold text-[#6E685E] uppercase tracking-wider font-mono pl-0.5">Email</Label>
                 <Input
                   id="email"
                   type="email"
@@ -173,7 +173,7 @@ function LoginPageContent() {
               
               {/* Micro-Indented Real-World Input Box */}
               <div className="space-y-1.5">
-                <Label htmlFor="password" className="text-[10px] font-bold text-[#6E685E] uppercase tracking-wider font-mono pl-0.5">Passphrase Key</Label>
+                <Label htmlFor="password" className="text-[10px] font-bold text-[#6E685E] uppercase tracking-wider font-mono pl-0.5">Password</Label>
                 <Input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
