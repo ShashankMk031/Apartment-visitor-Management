@@ -22,6 +22,7 @@ function LoginPageContent() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [isMock, setIsMock] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     setIsMock(!hasSupabaseCreds());
@@ -175,12 +176,23 @@ function LoginPageContent() {
                 <Label htmlFor="password" className="text-[10px] font-bold text-[#6E685E] uppercase tracking-wider font-mono pl-0.5">Passphrase Key</Label>
                 <Input
                   id="password"
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="bg-[#F0EDE8] border border-[#DCD6CB] text-xs text-[#2A2825] placeholder:text-[#9F988F] rounded-xl h-10 shadow-[inset_1px_1px_4px_rgba(163,157,147,0.15)] focus-visible:ring-1 focus-visible:ring-[#4E8079]"
                 />
+                {/* show password */}
+                <div className="flex items-center justify-end">
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="text-[10px] font-bold text-[#6E685E] uppercase tracking-wider font-mono"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? 'Hide' : 'Show'}
+                  </Button>
+                </div>
               </div>
 
               {/* Muted Soft Elevated Primary Teal CTA Button */}
@@ -190,7 +202,7 @@ function LoginPageContent() {
                 disabled={loading}
                 className="w-full bg-[#4E8079] hover:bg-[#3F6B65] active:bg-[#4E8079] active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.2)] text-white font-bold text-xs h-10 rounded-xl border border-[#6BA199] shadow-[2px_2px_6px_rgba(78,128,121,0.25)] transition-all mt-2 cursor-pointer"
               >
-                {loading ? 'Validating Node Token...' : 'Initialize Session'}
+                {loading ? 'Signing In...' : 'Sign In'}
               </Button>
             </form>
           </CardContent>

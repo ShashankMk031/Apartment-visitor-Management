@@ -98,7 +98,7 @@ export default function AdminApartments() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] bg-[#F0EDE8] rounded-[28px] p-8">
+      <div className="flex flex-col items-center justify-center min-h-100 bg-[#F0EDE8] rounded-[28px] p-8">
         <RefreshCw className="w-8 h-8 text-[#4E8079] animate-spin" strokeWidth={1.8} />
         <span className="text-xs text-[#6E685E] font-medium mt-3 tracking-wide">Syncing Configurations...</span>
       </div>
@@ -211,9 +211,9 @@ export default function AdminApartments() {
             {/* Premium crisp white box layout inset frame */}
             <div className="bg-white p-4 rounded-2xl inline-block mx-auto shadow-[inset_2px_2px_6px_rgba(0,0,0,0.1),2px_2px_5px_rgba(255,255,255,0.8)] border border-[#E0DACF]">
               {qrCodeDataUrl ? (
-                <img src={qrCodeDataUrl} alt="Apartment Gate QR" className="w-[180px] h-[180px] mix-blend-multiply" />
+                <img src={qrCodeDataUrl} alt="Apartment Gate QR" className="w-45 h-45 mix-blend-multiply" />
               ) : (
-                <div className="w-[180px] h-[180px] bg-[#F0EDE8] flex items-center justify-center text-[#8A8276] text-xs font-mono font-medium animate-pulse">
+                <div className="w-45 h-45 bg-[#F0EDE8] flex items-center justify-center text-[#8A8276] text-xs font-mono font-medium animate-pulse">
                   Rendering Anchor Vector...
                 </div>
               )}
