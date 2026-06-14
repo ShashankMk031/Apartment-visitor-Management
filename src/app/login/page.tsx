@@ -159,7 +159,7 @@ function LoginPageContent() {
             <form onSubmit={handleLogin} className="space-y-4">
               {/* Micro-Indented Real-World Input Box */}
               <div className="space-y-1.5">
-                <Label htmlFor="email" className="text-[10px] font-bold text-[#6E685E] uppercase tracking-wider font-mono pl-0.5">Email Matrix</Label>
+                <Label htmlFor="email" className="text-[10px] font-bold text-[#6E685E] uppercase tracking-wider font-mono pl-0.5">Email</Label>
                 <Input
                   id="email"
                   type="email"
@@ -173,7 +173,7 @@ function LoginPageContent() {
               
               {/* Micro-Indented Real-World Input Box */}
               <div className="space-y-1.5">
-                <Label htmlFor="password" className="text-[10px] font-bold text-[#6E685E] uppercase tracking-wider font-mono pl-0.5">Passphrase Key</Label>
+                <Label htmlFor="password" className="text-[10px] font-bold text-[#6E685E] uppercase tracking-wider font-mono pl-0.5">Password</Label>
                 <Input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
