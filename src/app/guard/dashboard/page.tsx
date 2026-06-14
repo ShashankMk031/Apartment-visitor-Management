@@ -121,45 +121,46 @@ export default function GuardDashboard() {
             });
           }
 
-          const { data: alerts } = await supabase.from('emergency_alerts').select('*').eq('status', 'ACTIVE');
+           const { data: alerts } = await supabase.from('emergency_alerts').select('*').eq('status', 'ACTIVE');
           if (alerts) setActiveAlerts(alerts);
-
+ 
           const { data: res } = await supabase.from('residents').select('*');
           if (res) setResidents(res);
-
+ 
           const { data: reqs } = await supabase.from('visitor_requests').select('*');
           const { data: entries } = await supabase.from('visitor_entries').select('*').order('entry_time', { ascending: false });
-
-          if (reqs && entries) {
-            const checkedInRequestIds = new Set(entries.map((e: any) => e.visitor_request_id));
-            const approved = reqs.filter((r: any) => r.status === 'APPROVED' && !checkedInRequestIds.has(r.id));
-            setApprovedRequests(approved);
-
-            const activeInside = entries
-               .filter((e: any) => !e.exit_time)
-               .map((e: any) => {
-                 const req = reqs.find((r: any) => r.id === e.visitor_request_id);
-                 const resident = res?.find((r: any) => r.id === req?.resident_id);
-                 return {
-                   ...e,
-                   request: req,
-                   residentFlat: resident?.flat_number || 'TBD'
-                 };
-               })
-               .filter((e: any) => e.request !== undefined);
-            setInsideEntries(activeInside);
-
-            const logs = entries.map((e: any) => {
-              const req = reqs.find((r: any) => r.id === e.visitor_request_id);
-              const resident = res?.find((r: any) => r.id === req?.resident_id);
-              return {
-                ...e,
-                request: req,
-                residentFlat: resident?.flat_number || 'TBD'
-              };
-            }).filter((e: any) => e.request !== undefined);
-            setAllLogs(logs);
-          }
+ 
+          const safeReqs = reqs || [];
+          const safeEntries = entries || [];
+ 
+          const checkedInRequestIds = new Set(safeEntries.map((e: any) => e.visitor_request_id));
+          const approved = safeReqs.filter((r: any) => r.status === 'APPROVED' && !checkedInRequestIds.has(r.id));
+          setApprovedRequests(approved);
+ 
+          const activeInside = safeEntries
+             .filter((e: any) => !e.exit_time)
+             .map((e: any) => {
+               const req = safeReqs.find((r: any) => r.id === e.visitor_request_id);
+               const resident = res?.find((r: any) => r.id === req?.resident_id);
+               return {
+                 ...e,
+                 request: req,
+                 residentFlat: resident?.flat_number || 'TBD'
+               };
+             })
+             .filter((e: any) => e.request !== undefined);
+          setInsideEntries(activeInside);
+ 
+          const logs = safeEntries.map((e: any) => {
+            const req = safeReqs.find((r: any) => r.id === e.visitor_request_id);
+            const resident = res?.find((r: any) => r.id === req?.resident_id);
+            return {
+              ...e,
+              request: req,
+              residentFlat: resident?.flat_number || 'TBD'
+            };
+          }).filter((e: any) => e.request !== undefined);
+          setAllLogs(logs);
         }
       }
     } catch (err) {
