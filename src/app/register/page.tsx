@@ -173,7 +173,7 @@ export default function PassLookupPage() {
     }
 
     if (req.status === 'APPROVED') {
-      QRCode.toDataURL(req.id, {
+      QRCode.toDataURL(req.qr_code_pass || req.id, {
         width: 200,
         margin: 2,
         color: {

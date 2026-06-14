@@ -179,7 +179,7 @@ export default function AdminGuards() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] bg-[#F0EDE8] rounded-[28px] p-8">
+      <div className="flex flex-col items-center justify-center min-h-100 bg-[#F0EDE8] rounded-[28px] p-8">
         <RefreshCw className="w-8 h-8 text-[#4E8079] animate-spin" strokeWidth={1.8} />
         <span className="text-xs text-[#6E685E] font-medium mt-3 tracking-wide">Syncing Security Roster...</span>
       </div>

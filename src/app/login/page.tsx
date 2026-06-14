@@ -141,10 +141,10 @@ function LoginPageContent() {
               <div className="w-6 h-6 rounded-md bg-[#F0EDE8] border border-white flex items-center justify-center shadow-xs">
                 <LogIn className="w-3.5 h-3.5 text-[#4E8079]" strokeWidth={2} />
               </div>
-              Console Authentication
+              Authentication Login
             </CardTitle>
             <CardDescription className="text-xs text-[#6E685E] pt-0.5">
-              Provide authorized node credentials below
+              Enter your email and password to log in
             </CardDescription>
           </CardHeader>
           
